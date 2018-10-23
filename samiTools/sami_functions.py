@@ -15,7 +15,7 @@ import re
 import string
 import sys
 import unicodedata
-from samiTools.marc_data import *
+# from samiTools.marc_data import *
 
 __author__ = 'Victoria Morris'
 __license__ = 'MIT License'
@@ -91,18 +91,4 @@ def exit_prompt(message=None):
 def clean_text(s):
     """Function to remove control characters and escape invalid HTML characters <>&"""
     if s is None or not s: return None
-    return html.escape(re.sub(r'\p{Cc}', '', s))
-
-
-def line_to_field(field_content):
-    field_content = field_content.strip()
-    tag = field_content[0:3]
-    try: test = int(tag)
-    except: test = None
-    if (test and test < 10) or tag in ALEPH_CONTROL_FIELDS or tag == '000':
-        return Field(tag=tag, data=field_content.split('|a', 1)[1])
-    subfields = []
-    for s in field_content.split('|')[1:]:
-        try: subfields.extend([s[0], s[1:]])
-        except: pass
-    return Field(tag=tag, indicators=[' ', ' '], subfields=subfields)
+    return html.escape(re.sub(r'[\u0000-\u001F\u007F-\u009F]', '', s))

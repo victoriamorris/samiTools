@@ -23,6 +23,7 @@ long_description = ''
 # All other requirements should all be contained in the standard library
 requirements = [
     'py2exe',
+    'regex',
 ]
 
 # Setup

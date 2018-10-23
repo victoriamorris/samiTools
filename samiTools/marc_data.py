@@ -3,6 +3,7 @@
 """MARC record processing tools used within samiTools."""
 
 # Import required modules
+
 from samiTools.sami_functions import *
 
 __author__ = 'Victoria Morris'
@@ -165,7 +166,7 @@ class SAMIRecord(object):
                             except:
                                 if s == 'u':
                                     try:
-                                        subfields.extend([s, re.search(SUBS[d], call).group(0).strip()])
+                                        subfields.extend([s, re.search(SUBS['d'], call).group(0).strip()])
                                     except:
                                         pass
                                 else:
@@ -365,7 +366,6 @@ class MARCRecord(object):
         if len(self.leader) != LEADER_LENGTH: raise LeaderError
 
         # Determine character encoding
-        marc8 = self.leader[9] != 'a'
         self.leader = self.leader[0:9] + 'a' + self.leader[10:]
 
         # Extract the byte offset where the record data starts
@@ -410,20 +410,12 @@ class MARCRecord(object):
 
                 for subfield in subs[1:]:
                     if len(subfield) == 0: continue
-                    if marc8:
-                        try:
-                            code, data = subfield[0:1].decode('ascii'), marc8_to_unicode(subfield[1:])
-                            subfields.append(code)
-                            subfields.append(data)
-                        except:
-                            print('Error in subfield code in field {}'.format(entry_tag))
-                    else:
-                        try:
-                            code, data = subfield[0:1].decode('ascii'), subfield[1:].decode('utf-8', 'strict')
-                            subfields.append(code)
-                            subfields.append(data)
-                        except:
-                            print('Error in subfield code in field {}'.format(entry_tag))
+                    try:
+                        code, data = subfield[0:1].decode('ascii'), subfield[1:].decode('utf-8', 'strict')
+                        subfields.append(code)
+                        subfields.append(data)
+                    except:
+                        print('Error in subfield code in field {}'.format(entry_tag))
                 field = Field(
                     tag=entry_tag,
                     indicators=[first_indicator, second_indicator],
@@ -544,7 +536,7 @@ class Field(object):
 
     def add_subfield(self, code, value):
         self.subfields.append(code)
-        self.subfields.append(clean(value))
+        self.subfields.append(clean_text(value))
 
     def is_control_field(self):
         if self.tag < '010' and self.tag.isdigit(): return True
@@ -566,3 +558,22 @@ class Field(object):
         for subfield in self:
             xml += '\n\t\t\t<marc:subfield code="{}">{}</marc:subfield>'.format(subfield[0], clean_text(subfield[1].strip()))
         return xml + '\n\t\t</marc:datafield>'
+
+
+# ====================
+#      Functions
+# ====================
+
+
+def line_to_field(field_content):
+    field_content = field_content.strip()
+    tag = field_content[0:3]
+    try: test = int(tag)
+    except: test = None
+    if (test and test < 10) or tag in ALEPH_CONTROL_FIELDS or tag == '000':
+        return Field(tag=tag, data=field_content.split('|a', 1)[1])
+    subfields = []
+    for s in field_content.split('|')[1:]:
+        try: subfields.extend([s[0], s[1:]])
+        except: pass
+    return Field(tag=tag, indicators=[' ', ' '], subfields=subfields)
