@@ -1,2 +1,247 @@
 # samiTools
-Tools for working with data from SAMI
+Tools for working with SAMI files 
+
+## Requirements
+
+None.
+
+## Installation
+
+From GitHub:
+
+    git clone https://github.com/victoriamorris/samiTools
+    cd samiTools
+
+To install as a Python package:
+
+    python setup.py install
+    
+To create stand-alone executable (.exe) files for individual scripts:
+
+    python setup.py py2exe 
+    
+Executable files will be created in the folder \dist, and should be copied to an executable path.
+
+Both of the above commands can be carried out by running the shell script:
+
+    compile_samiTools.sh
+
+## Usage
+
+### Running scripts
+
+The following scripts can be run from anywhere, once the package is installed:
+
+#### sami2marc_authorities
+
+Converts SAMI records for **authorities** to MARC 21 Authority 
+in either MARC exchange (.lex) or MARC XML (.xml) format. 
+    
+    Usage: sami2marc_authorities.exe -i <ifile> -o <ofile>
+    
+        -i    path to Input file
+        -o    path to Output file
+
+    Options:
+        --help    Show help message and exit.
+      
+Input files must be SAMI Authority files in **text** format; the files should have .txt file extensions.
+
+The output file will either be a MARC exchange format file (with a .lex file extension) 
+or a MARC XML file (with an .xml file extension)
+according to the file extension of the \<ofile> parameter.
+
+##### Example SAMI Authority record:
+
+    XX246721        		NAME		AUTHORIZED		9/11/2016		JCOLLIER  		9/11/2016		JCOLLIER  		NEVER		                    	
+    000:   |az n  n a
+    008:   |a161109   a    aaa
+    100:   |aWright, David,|b1976-
+    300:   |apn
+    312:   |ahttp://www.bach-cantatas.com/Bio/Wright-David.htm
+    680:   |aharpsichord
+
+#### sami2marc_products
+
+Converts SAMI records for **products** (words, reocordings, etc.) to MARC 21 Bibliographic 
+in either MARC exchange (.lex) or MARC XML (.xml) format. 
+    
+    Usage: sami2marc_products.exe -i <input_path> -o <output_path>
+    
+        -i    path to FOLDER containing Input files
+        -o    path to FOLDER to contain Output files
+    
+    Options:
+        -x        Output files will be MARC XML rather than MARC 21 (.lex)
+        --help    Show help message and exit.
+
+
+The output files will either be a MARC exchange format file (with.lex file extensions) 
+or MARC XML files (with .xml file extensions)
+according to whether the -x flag has been set.
+
+Input files can be in any of the formats listed below.
+
+##### prn
+
+An XML format exported directly from SAMI.
+ 
+###### Example record
+
+    <catalog>
+        <marc>
+            <marcEntry tag="000" label="Leader" ind="  ">|aam     a</marcEntry>
+            <marcEntry tag="008" label="Fixed  field data" ind="  ">|a180214n                      000 0 eng u</marcEntry>
+            <marcEntry tag="087" label="SHELFMARK" ind="  ">|aC728/666</marcEntry>
+            <marcEntry tag="490" label="Collection title" ind="  ">|aSerious Speakout Demo Tape collection|=^A230912</marcEntry>
+            <marcEntry tag="702" label="Contributor" ind="  ">|aBalke, J.|c(performer)|?UNAUTHORIZED</marcEntry>
+            <marcEntry tag="702" label="Contributor" ind="  ">|aunnamed|cband|=^A3560</marcEntry>
+            <marcEntry tag="633" label="Genre" ind="  ">|aDemo recordings|=^A251347</marcEntry>
+            <marcEntry tag="596" label="Held by" ind="  ">|a3</marcEntry>
+            <marcEntry tag="246" label="Item title" ind="  ">|a[Title unknown]</marcEntry>
+            <marcEntry tag="301" label="Item duration" ind="  ">|a4 min. 07 sec.</marcEntry>
+            <marcEntry tag="974" label="MD-ARK" ind="  ">|aark:/81055/vdc_100058552022.0x000052</marcEntry>
+            <marcEntry tag="975" label="L-ARK: INGESTED" ind="  ">|aark:/81055/vdc_100058676993.0x000006</marcEntry>
+            <marcEntry tag="971" label="Cataloguing status" ind="  ">|aprc</marcEntry>
+            <marcEntry tag="312" label="Content  code" ind="  ">|aa</marcEntry>
+            <marcEntry tag="001" label="Record control no." ind="  ">|aCKEY8128528</marcEntry>
+        </marc>
+        <call>
+            <callNumber>   C728/666 S1 C1</callNumber>
+            <library>RECORDING</library>
+            <numberOfCallHolds>0</numberOfCallHolds>
+            <numberOfCopies>1</numberOfCopies>
+            <copiesOnReserve>0</copiesOnReserve>
+            <item>
+                <copyNumber>1</copyNumber>
+                <itemID>8128528-1001</itemID>
+                <library>RECORDING</library>
+                <libraryDescription>RECORDING</libraryDescription>
+                <location>STORE+E</location>
+                <homeLocation>STORE+E</homeLocation>
+                <price currency="GBP" >0.00</price>
+                <category1>POP</category1>
+                <type>RECORDING</type>
+                <numberOfPieces>1</numberOfPieces>
+                <dateCreated>2018-05-10</dateCreated>
+                <isPermanent>true</isPermanent>
+            </item>
+        </call>
+    </catalog>
+
+##### XML
+
+An XML format harvested via OAI-PMH.
+
+###### Example record
+
+    <header>
+        <identifier>1</identifier>
+    </header>
+    <metadata>
+        <record>
+            <datafield tag="099" ind1="" ind2="">
+                <subfield code="z">m</subfield>
+            </datafield>
+            <controlfield tag="000">am  0c a</controlfield>
+            <controlfield tag="001">CKEY1</controlfield>
+            <datafield tag="087" ind1="" ind2="">
+                <subfield code="a">1CD0033672</subfield>
+            </datafield>
+            <datafield tag="299" ind1="" ind2="">
+                <subfield code="a">Jamaican rumba/Benjamin</subfield>
+            </datafield>
+            <datafield tag="702" ind1="" ind2="">
+                <subfield code="a">Adler, Larry,</subfield>
+                <subfield code="b">1914-2001</subfield>
+                <subfield code="c">Harmonica</subfield>
+                <subfield code="=">^A14637</subfield>
+            </datafield>
+            <datafield tag="702" ind1="" ind2="">
+                <subfield code="a">Robinson, Eric</subfield>
+                <subfield code="c">(conductor)</subfield>
+                <subfield code="?">UNAUTHORIZED</subfield>
+            </datafield>
+            <datafield tag="702" ind1="" ind2="">
+                <subfield code="a">Pro Arte Orchestra</subfield>
+                <subfield code="?">UNAUTHORIZED</subfield>
+            </datafield>
+            <datafield tag="260" ind1="" ind2="">
+                <subfield code="c">1957</subfield>
+            </datafield>
+            <datafield tag="551" ind1="" ind2="">
+                <subfield code="a">Watford Town Hall</subfield>
+            </datafield>
+            <datafield tag="596" ind1="" ind2="">
+                <subfield code="a">3</subfield>
+            </datafield>
+            <datafield tag="301" ind1="" ind2="">
+                <subfield code="a">3 min. 33 sec.</subfield>
+            </datafield>
+            <datafield tag="509" ind1="" ind2="">
+                <subfield code="a">1958 Original recording (P) date</subfield>
+            </datafield>
+            <datafield tag="974" ind1="" ind2="">
+                <subfield code="a">ark:/81055/vdc_100000006155.0x000001</subfield>
+            </datafield>
+            <datafield tag="976" ind1="" ind2="">
+                <subfield code="a">ND</subfield>
+            </datafield>
+            <datafield tag="971" ind1="" ind2="">
+                <subfield code="a">de</subfield>
+            </datafield>
+            <datafield tag="312" ind1="" ind2="">
+                <subfield code="a">a</subfield>
+            </datafield>
+            <datafield tag="024" ind1="" ind2="">
+                <subfield code="a">10000012</subfield>
+                <subfield code="2">nd</subfield>
+            </datafield>
+            <datafield tag="999" ind1="" ind2="">
+                <subfield code="a">1CD0033672 D1 S1 BD6 EMI PHOENIXA</subfield>
+                <subfield code="w">ALPHANUM</subfield>
+                <subfield code="c">1</subfield>
+                <subfield code="i">1-1001</subfield>
+                <subfield code="d">15/8/1995</subfield>
+                <subfield code="l">STORE</subfield>
+                <subfield code="m">RECORDING</subfield>
+                <subfield code="r">Y</subfield>
+                <subfield code="s">Y</subfield>
+                <subfield code="t">RECORDING</subfield>
+                <subfield code="u">15/8/1995</subfield>
+                <subfield code="x">CLASSICAL</subfield>
+                <subfield code="z">ORCHESTRAL</subfield>
+            </datafield>
+        </record>
+    </metadata>
+
+##### SAMI text format
+
+A text format exported directly from SAMI.
+
+  The file-name should end with one of the following:  
+  * export_ALL
+  * export_DOCRECITEM
+  * export_MLRECITEM
+  * export_PUBLPROD
+  * export_WORK
+  * export_WRSECITEM
+  
+###### Example record
+  
+    *** DOCUMENT BOUNDARY ***
+    FORM=WORK
+    .000. |aam  0c a
+    .001. |aCKEY637624
+    .239.   |aMusic For The Royal Fireworks
+    .240.   |aMusic for the royal fireworks;|carr.
+    .299.   |aMusic For The Royal Firework/Hande-Baine
+    .312.   |aw
+    .596.   |a2
+    .700.   |aBaines, Anthony Cuthbert|c(arranger)|?UNAUTHORIZED
+    .700.   |aMackerras, Charles,|b1925-2010|c(arranger)|=^A56137
+    .700.   |aHandel, George Frideric,|b1685-1759|c(composer)|=^A305
+    .971.   |aun
+    .976.   |aND
+    .974.   |aark:/81055/vdc_100000006155.0x096d5a
+    .999.   |aXX(2028559.1)|wALPHANUM|c1|i637624-1001|d16/8/1995|lRECORDED|mWORKS-FILE|rY|sY|tWORK|u16/8/1995
