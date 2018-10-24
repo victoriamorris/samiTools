@@ -18,7 +18,20 @@ __status__ = '4 - Beta Development'
 
 LEADER_LENGTH, DIRECTORY_ENTRY_LENGTH = 24, 12
 SUBFIELD_INDICATOR, END_OF_FIELD, END_OF_RECORD = chr(0x1F), chr(0x1E), chr(0x1D)
-ALEPH_CONTROL_FIELDS = ['DB ', 'FMT', 'SYS', 'LDR']
+ALEPH_CONTROL_FIELDS = ['DB ', 'SYS', 'LDR']
+
+SUBS = OrderedDict([
+    ('c', re.compile(r'<copyNumber>(.*?)</copyNumber>')),
+    ('i', re.compile(r'<itemID>(.*?)</itemID>')),
+    ('d', re.compile(r'<dateCreated>(.*?)</dateCreated>')),
+    ('k', re.compile(r'<location>(.*?)</location>')),
+    ('l', re.compile(r'<homeLocation>(.*?)</homeLocation>')),
+    ('m', None),
+    ('t', re.compile(r'<type>(.*?)</type>')),
+    ('u', re.compile(r'<dateModified>(.*?)</dateModified>')),
+    ('x', re.compile(r'<category1>(.*?)</category1>')),
+    ('z', re.compile(r'<category2>(.*?)</category2>')),
+])
 
 # ====================
 #     Exceptions
@@ -88,13 +101,12 @@ class SAMIReader(object):
 
     def new_record(self, line):
         if self.reader_type == 'prn':
-            if line.strip == '<catalog>': return True
-            if any(s in line for s in
-                   ['<?xml version', '<title>', '<report>', '<dateCreated>', '<dateFormat>']): return True
+            if any(s in line for s in ['<?xml version', '<title>', '<report>', '</report>', '<dateFormat>', '<catalog>']): return True
+            if re.search(r'^<dateCreated>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}</dateCreated>$', line.strip()): return True
             return False
         if self.reader_type == 'xml':
             if any(s in line for s in ['<record xmlns="http://www.loc.gov/mods/v3">', '<?xml version', '<OAI-PMH',
-                                       '<ListRecords>']): return True
+                                       '<ListRecords>', '</ListRecords>']): return True
             return False
         if self.reader_type == 'txt':
             if '*** DOCUMENT BOUNDARY ***' in line: return True
@@ -103,6 +115,7 @@ class SAMIReader(object):
 
 
 class SAMIRecord(object):
+
     def __init__(self, data, record_type):
         self.record_type = record_type
         self.record = MARCRecord()
@@ -111,81 +124,50 @@ class SAMIRecord(object):
         if self.record_type == 'prn':
             for field in re.findall(r'<marcEntry tag="(.*?)" label="(.*?)" ind="(.*?)">(.*?)</marcEntry>', self.data):
                 tag, label, ind1, ind2, content = field[0], field[1], field[2][0], field[2][1], field[3]
-                # if tag == '000': tag = 'LDR'
-                try:
-                    test = int(tag)
-                except:
-                    test = None
-                if tag in ['LDR', 'FMT', '000']:
-                    f = Field(tag=tag, indicators=[ind1, ind2], subfields=['a', content.split('|a', 1)[1].strip()])
-                elif tag == '000' or (test and test < 10) or tag in ALEPH_CONTROL_FIELDS:
-                    try:
-                        f = Field(tag=tag, data=content.split('|a', 1)[1].strip())
-                    except:
-                        f = Field(tag=tag, data=content.strip())
+                try: test = int(tag)
+                except: test = None
+                if tag == '000' or (test and test < 10) or tag in ALEPH_CONTROL_FIELDS:
+                    try: f = Field(tag=tag, data=content.split('|a', 1)[1].strip())
+                    except: f = Field(tag=tag, data=content.strip())
                 else:
                     subfields = []
                     for s in content.split('|')[1:]:
-                        try:
-                            subfields.extend([s[0], s[1:]])
-                        except:
-                            pass
+                        try: subfields.extend([s[0], s[1:]])
+                        except: pass
                     f = Field(tag=tag, indicators=[ind1, ind2], subfields=subfields)
-                self.record.add_field(f)
+                self.record.add_ordered_field(f)
+            self.data = ''.join(line for line in self.data.split('\n'))
             for call in re.findall(r'<call>(.*?)</call>', self.data):
-                try:
-                    call_number = re.search(r'<callNumber>(.*?)</callNumber>', call).group(0)
-                except:
-                    call_number = '[NO CALL NUMBER]'
-                try:
-                    library = re.search(r'<library>(.*?)</library>', call).group(0)
-                except:
-                    library = None
+                try: call_number = re.search(r'<callNumber>(.*?)</callNumber>', call).group(1)
+                except: call_number = '[NO CALL NUMBER]'
+                try: library = re.search(r'<library>(.*?)</library>', call).group(1)
+                except: library = None
                 for item in re.findall(r'<item>(.*?)</item>', call):
                     subfields = ['a', call_number, 'w', 'ALPHANUM']
-                    SUBS = OrderedDict([
-                        ('c', re.compile(r'<copyNumber>(.*?)</copyNumber>')),
-                        ('i', re.compile(r'<itemID>(.*?)</itemID>')),
-                        ('d', re.compile(r'<dateCreated>(.*?)</dateCreated>')),
-                        ('k', re.compile(r'<location>(.*?)</location>')),
-                        ('l', re.compile(r'<homeLocation>(.*?)</homeLocation>')),
-                        ('m', None),
-                        ('t', re.compile(r'<type>(.*?)</type>')),
-                        ('u', re.compile(r'<dateModified>(.*?)</dateModified>')),
-                        ('u', re.compile(r'<category1>(.*?)</category1>')),
-                        ('u', re.compile(r'<category2>(.*?)</category2>')),
-                    ])
                     for s in SUBS:
                         if s == 'm':
                             if library:
                                 subfields.extend(['m', library])
                             subfields.extend(['r', 'Y', 's', 'Y'])
                         else:
-                            try:
-                                subfields.extend([s, re.search(SUBS[s], call).group(0).strip()])
+                            try: subfields.extend([s, re.search(SUBS[s], item).group(1).strip()])
                             except:
                                 if s == 'u':
-                                    try:
-                                        subfields.extend([s, re.search(SUBS['d'], call).group(0).strip()])
-                                    except:
-                                        pass
-                                else:
-                                    pass
+                                    try: subfields.extend([s, re.search(SUBS['d'], item).group(1).strip()])
+                                    except: pass
+                                else: pass
                     f = Field(tag='999', indicators=[' ', ' '], subfields=subfields)
-                    self.record.add_field(f)
+                    self.record.add_ordered_field(f)
 
         elif self.record_type == 'xml':
             for field in re.findall(r'<controlfield tag="(.*?)">(.*?)</controlfield>', self.data, re.M):
                 tag, data = field[0], field[1]
-                # if tag == '000': tag = 'LDR'
                 subfields = []
                 for s in re.findall(r'<subfield code="(.)">(.*?)</subfield>', data):
-                    try:
-                        subfields.extend([s[0], s[1]])
-                    except:
-                        pass
+                    try: subfields.extend([s[0], s[1]])
+                    except: pass
                 f = Field(tag=tag, data=data)
-                self.record.add_field(f)
+                self.record.add_ordered_field(f)
             self.data = ''.join(line for line in self.data.split('\n'))
             for field in re.findall(r'<datafield tag="(.*?)" ind1="(.?)" ind2="(.?)">(.*?)</datafield>', self.data,
                                     re.M):
@@ -194,12 +176,10 @@ class SAMIRecord(object):
                 if ind2 == '': ind2 = ' '
                 subfields = []
                 for s in re.findall(r'<subfield code="(.)">(.*?)</subfield>', data):
-                    try:
-                        subfields.extend([s[0], s[1]])
-                    except:
-                        pass
+                    try: subfields.extend([s[0], s[1]])
+                    except: pass
                 f = Field(tag=tag, indicators=[ind1, ind2], subfields=subfields)
-                self.record.add_field(f)
+                self.record.add_ordered_field(f)
 
         elif self.record_type == 'txt':
             for line in self.data.split('\n'):
@@ -208,29 +188,22 @@ class SAMIRecord(object):
                         continue
                     elif 'FORM=' in line:
                         f = Field(tag='FMT', indicators=[' ', ' '], subfields=['a', line.split('=', 1)[1].strip()])
-                        self.record.add_field(f)
+                        self.record.add_ordered_field(f)
                     else:
                         tag = line[1:4]
-                        # if tag == '000': tag = 'LDR'
-                        try:
-                            test = int(tag)
-                        except:
-                            test = None
-                        if tag in ['LDR', 'FMT']:
-                            f = Field(tag=tag, indicators=[' ', ' '], subfields=['a', line.split('|a', 1)[1].strip()])
-                        elif tag == '000' or (test and test < 10) or tag in ALEPH_CONTROL_FIELDS:
+                        try: test = int(tag)
+                        except: test = None
+                        if tag == '000' or (test and test < 10) or tag in ALEPH_CONTROL_FIELDS:
                             f = Field(tag=tag, data=line.split('|a', 1)[1].strip())
                         else:
                             ind1 = line[6]
                             ind2 = line[7]
                             subfields = []
                             for s in line.split('|')[1:]:
-                                try:
-                                    subfields.extend([s[0], s[1:]])
-                                except:
-                                    pass
+                                try: subfields.extend([s[0], s[1:]])
+                                except: pass
                             f = Field(tag=tag, indicators=[ind1, ind2], subfields=subfields)
-                        self.record.add_field(f)
+                        self.record.add_ordered_field(f)
 
     def as_marc(self):
         return self.record.as_marc()
