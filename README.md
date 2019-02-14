@@ -43,9 +43,9 @@ in either MARC exchange (.lex) or MARC XML (.xml) format.
         -o    path to Output file
 
     Options:
-	--date <yyyymmdd>
+        --date <yyyymmdd>
 	          split output into two files by specified date.
-	--tidy    tidy authority files to facilitate load to MetAg.
+        --tidy    tidy authority files to facilitate load to MetAg.
         --help    Show help message and exit.
       
 Input files must be SAMI Authority files in **text** format; the files should have .txt or .prn file extensions.
@@ -90,7 +90,7 @@ in either MARC exchange (.lex) or MARC XML (.xml) format.
     
     Options:
         -x        Output files will be MARC XML rather than MARC 21 (.lex)
-	--max_size <number|size>	
+        --max_size <number|size>	
 		  Split output
         --help    Show help message and exit.
 
