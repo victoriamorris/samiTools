@@ -44,7 +44,7 @@ in either MARC exchange (.lex) or MARC XML (.xml) format.
 
     Options:
         --date <yyyymmdd>
-	          split output into two files by specified date.
+                  split output into two files by specified date.
         --tidy    tidy authority files to facilitate load to MetAg.
         --help    Show help message and exit.
       
@@ -91,7 +91,7 @@ in either MARC exchange (.lex) or MARC XML (.xml) format.
     Options:
         -x        Output files will be MARC XML rather than MARC 21 (.lex)
         --max_size <number|size>	
-		  Split output
+                  Split output
         --help    Show help message and exit.
 
 The output files will either be a MARC exchange format file (with.lex file extensions) 
