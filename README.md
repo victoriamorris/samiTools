@@ -43,15 +43,32 @@ in either MARC exchange (.lex) or MARC XML (.xml) format.
         -o    path to Output file
 
     Options:
+	--date <yyyymmdd>
+	          split output into two files by specified date.
+	--tidy    tidy authority files to facilitate load to MetAg.
         --help    Show help message and exit.
       
-Input files must be SAMI Authority files in **text** format; the files should have .txt file extensions.
+Input files must be SAMI Authority files in **text** format; the files should have .txt or .prn file extensions.
 
 The output file will either be a MARC exchange format file (with a .lex file extension) 
 or a MARC XML file (with an .xml file extension)
 according to the file extension of the \<ofile> parameter.
 
+Records with errors will be written to \<ofile>_errors, and will NOT appear in any other output files.
+
+If parameter --date is specified:
+	Records with a created or amended date ealier than the value specified will be written to \<ofile>_pre_\<date>;
+	Records with a created or amended date equal to or later than the value specified will be written to \<ofile>_post_\<date>.
+The --date parameter MUST be in the form yyyymmdd, e.g. 20100607.
+
+If parameter --tidy is specified:
+	If no 001 is present, one will be created from the first instance of 901 $a;
+	904 $a and 905 $a will be combined into a single 904 field ($a and $b);
+	906 $a and 907 $a will be combined into a single 906 field ($a and $b);
+	Created and Amended date will be converted from dd/mm/yy to yyyymmdd format.
+
 ##### Example SAMI Authority record:
+(may have a .prn file extension)
 
     XX246721        		NAME		AUTHORIZED		9/11/2016		JCOLLIER  		9/11/2016		JCOLLIER  		NEVER		                    	
     000:   |az n  n a
@@ -73,12 +90,26 @@ in either MARC exchange (.lex) or MARC XML (.xml) format.
     
     Options:
         -x        Output files will be MARC XML rather than MARC 21 (.lex)
+	--max_size <number|size>	
+		  Split output
         --help    Show help message and exit.
 
-
 The output files will either be a MARC exchange format file (with.lex file extensions) 
-or MARC XML files (with .xml file extensions)
-according to whether the -x flag has been set.
+or MARC XML files (with .xml file extensions) according to whether the -x flag has been set.
+
+If parameter --max_size is specified:
+	--max-size must be a positive integer, optionally followed by the letter K.
+
+	max_size is EITHER the maximum number of records in an output file
+	OR the (approx.) maximum file size (in KB) if the number has the suffix 'K';
+
+	Output will be written to a sequence of files with the same name as the input file, 
+	but with a suffix indicating its order in the generated output sequence
+
+	EXCEPT in the special case of --max_size 1 (the file is split into individual records)
+	in which case the output files will be labelled	with the record identifier.
+	Records with duplicate identifiers will be labelled with a _DUPLICATE suffix.
+	Records without identifiers will be labelled with _NO IDENTIFIER.
 
 Input files can be in any of the formats listed below.
 
