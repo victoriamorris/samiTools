@@ -1,5 +1,5 @@
-python setup.py install
-python setup.py py2exe
+C:/python34/python setup.py install
+C:/python34/python setup.py py2exe
 mv dist/sami2marc_products.exe sami2marc_products.exe
 mv dist/sami2marc_authorities.exe sami2marc_authorities.exe
 cp sami2marc_products.exe ../sami2marc_products.exe
