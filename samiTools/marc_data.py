@@ -33,6 +33,11 @@ SUBS = OrderedDict([
     ('z', re.compile(r'<category2>(.*?)</category2>')),
 ])
 
+
+XML_HEADER = '<?xml version="1.0" encoding="UTF-8" ?>' \
+             '\n<marc:collection xmlns:marc="http://www.loc.gov/MARC21/slim" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ' \
+             'xsi:schemaLocation="http://www.loc.gov/MARC21/slim http://www.loc.gov/standards/marcxml/schema/MARC21slim.xsd">'
+
 # ====================
 #     Exceptions
 # ====================
@@ -208,8 +213,15 @@ class SAMIRecord(object):
     def as_marc(self):
         return self.record.as_marc()
 
+    def as_xml(self):
+        return self.record.as_xml()
+
     def __str__(self):
         return str(self.record)
+
+    def identifier(self):
+        try: return self.record['001'].data.replace('CKEY', '').strip()
+        except: return None
 
 
 class MARCReader(object):

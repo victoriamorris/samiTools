@@ -41,11 +41,13 @@ class FilePath:
         self.path = None
         self.function = function
         self.folder, self.filename, self.ext = '', '', ''
+        self.file_object = None
+        self.file_writer = None
         if path: self.set_path(path)
 
     def set_path(self, path):
         self.path = path
-        expected_ext = ['.txt'] if self.function == 'input' else ['.lex', '.xml']
+        expected_ext = ['.txt', '.prn'] if self.function == 'input' else ['.lex', '.xml']
         if not path or path == '':
             exit_prompt('Error: Could not parse path to {} file'.format(self.function))
         try:
