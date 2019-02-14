@@ -99,13 +99,10 @@ or MARC XML files (with .xml file extensions) according to whether the -x flag h
 
 If parameter --max_size is specified:
 	--max-size must be a positive integer, optionally followed by the letter K.
-
 	max_size is EITHER the maximum number of records in an output file
 	OR the (approx.) maximum file size (in KB) if the number has the suffix 'K';
-
 	Output will be written to a sequence of files with the same name as the input file, 
 	but with a suffix indicating its order in the generated output sequence
-
 	EXCEPT in the special case of --max_size 1 (the file is split into individual records)
 	in which case the output files will be labelled	with the record identifier.
 	Records with duplicate identifiers will be labelled with a _DUPLICATE suffix.
