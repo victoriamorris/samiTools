@@ -107,9 +107,9 @@ If parameter --max_size is specified:
 * Records without identifiers will be labelled with _NO IDENTIFIER.
 
 If parameter --header is specified:
-* MARC XML records will be given a <header> to make them suitable for the Metadata Aggregator.
-* The <header> will include the record identifier.
-* For deleted records, the <header> element will have an @status="deleted" attribute.
+* MARC XML records will be given a \<header\> to make them suitable for the Metadata Aggregator.
+* The \<header\> will include the record identifier.
+* For deleted records, the \<header\> element will have an @status="deleted" attribute.
 
 NOTE: --header can only be used if -x is also specified.
 
