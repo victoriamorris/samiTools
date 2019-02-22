@@ -38,6 +38,30 @@ XML_HEADER = '<?xml version="1.0" encoding="UTF-8" ?>' \
              '\n<marc:collection xmlns:marc="http://www.loc.gov/MARC21/slim" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ' \
              'xsi:schemaLocation="http://www.loc.gov/MARC21/slim http://www.loc.gov/standards/marcxml/schema/MARC21slim.xsd">'
 
+
+METAG_HEADER = '<?xml version="1.0" encoding="UTF-8" ?>' \
+               '\n<record xmlns="http://www.openarchives.org/OAI/2.0/" ' \
+               'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ' \
+               'xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/ http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd" ' \
+               'xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" ' \
+               'xmlns:marc="http://www.loc.gov/MARC21/slim" ' \
+               'xmlns:bl="http://www.bl.uk/schemas/digitalobject/entities#" ' \
+               'xmlns:blit="http://bl.uk/namespaces/blit">'
+
+
+OAI_HEADER = '<?xml version="1.0" encoding="UTF-8" ?>' \
+             '\n<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/" ' \
+             'xmlns:xsi="http//www.w3.org/2001/XMLSchema-instance" ' \
+             'xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/ http://www.openarchives.org/OAI/2.0/OAI-PMH.xsd"> ' \
+             '\n<ListRecords> '
+
+OAI_RECORD = '\n<record ' \
+             'xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" ' \
+             'xmlns:marc="http://www.loc.gov/MARC21/slim" ' \
+             'xmlns:bl="http://www.bl.uk/schemas/digitalobject/entities#" ' \
+             'xmlns:blit="http://bl.uk/namespaces/blit">'
+
+
 # ====================
 #     Exceptions
 # ====================
@@ -81,6 +105,7 @@ class SAMIReader(object):
         if hasattr(target, 'read') and callable(target.read):
             self.file_handle = target
         self.reader_type = reader_type
+        self.deleted = '_dels' in str(target)
 
     def __iter__(self):
         return self
@@ -94,7 +119,7 @@ class SAMIReader(object):
         chunk = ''
         line = self.file_handle.readline()
         if not line: raise StopIteration
-        while chunk == '' and line and self.new_record(line):
+        while chunk == '' and line and (self.new_record(line) or 'xmlns:xsi' in line):
             line = self.file_handle.readline()
             if not line: break
         while line and not self.new_record(line):
@@ -110,8 +135,12 @@ class SAMIReader(object):
             if re.search(r'^<dateCreated>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}</dateCreated>$', line.strip()): return True
             return False
         if self.reader_type == 'xml':
-            if any(s in line for s in ['<record xmlns="http://www.loc.gov/mods/v3">', '<?xml version', '<OAI-PMH',
+            if any(s in line for s in ['<record xmlns="http://www.loc.gov/mods/v3">', '<?xml version', '<OAI-PMH', '</OAI-PMH>',
                                        '<ListRecords>', '</ListRecords>']): return True
+            if self.deleted and any(s in line for s in ['<record>',
+                                                        'xmlns="http://www.openarchives.org/OAI/2.0/"',
+                                                        'xsi:schemaLocation="http://www.openarchives.org/OAI/2.0/',
+                                                        'http://www.openarchives.org/OAI/2.0/OAI- PMH.xsd"']): return True
             return False
         if self.reader_type == 'txt':
             if '*** DOCUMENT BOUNDARY ***' in line: return True
@@ -125,6 +154,7 @@ class SAMIRecord(object):
         self.record_type = record_type
         self.record = MARCRecord()
         self.data = data
+        self.deleted = '<header status="deleted">' in data
 
         if self.record_type == 'prn':
             for field in re.findall(r'<marcEntry tag="(.*?)" label="(.*?)" ind="(.*?)">(.*?)</marcEntry>', self.data):
@@ -213,15 +243,31 @@ class SAMIRecord(object):
     def as_marc(self):
         return self.record.as_marc()
 
-    def as_xml(self):
-        return self.record.as_xml()
+    def as_xml(self, namespace=False):
+        return self.record.as_xml(namespace=namespace)
 
     def __str__(self):
         return str(self.record)
 
     def identifier(self):
         try: return self.record['001'].data.replace('CKEY', '').strip()
-        except: return None
+        except:
+            try: return re.search(r'<identifier>(.*?)</identifier>', self.data).group(1).strip()
+            except: return None
+
+    def datestamp(self):
+        try: return re.search(r'<datestamp>(.*?)</datestamp>', self.data).group(1).strip()
+        except: return '[NO DATESTAMP]'
+
+    def header(self, deleted=False):
+        if self.deleted or deleted:
+            return '\n<header status="deleted">\n' \
+                   '<identifier>{}</identifier>\n' \
+                   '<datestamp>{}</datestamp>\n' \
+                   '</header>\n'.format(self.identifier(), self.datestamp())
+        return '\n<header>\n' \
+               '<identifier>{}</identifier>\n' \
+               '</header>\n'.format(self.identifier())
 
 
 class MARCReader(object):
@@ -433,8 +479,10 @@ class MARCRecord(object):
         leader = strleader.encode('utf-8')
         return leader + directory + fields
 
-    def as_xml(self):
-        xml = '\n\t<marc:record>'
+    def as_xml(self, namespace=False):
+        if namespace:
+            xml = '\n\t<marc:record xsi:schemaLocation="http://www.loc.gov/MARC21/slim http://www.loc.gov/standards/marcxml/schema/MARC21slim.xsd">'
+        else: xml = '\n\t<marc:record>'
         fields, directory = b'', b''
         offset = 0
         for field in self.fields:

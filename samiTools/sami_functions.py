@@ -29,6 +29,7 @@ __status__ = '4 - Beta Development'
 
 
 SAMI_SUFFICES = ('export_ALL', 'export_DOCRECITEM', 'export_MLRECITEM', 'export_PUBLPROD', 'export_WORK', 'export_WRSECITEM')
+PRIMO_FLAGS = ('primo_dels', 'primo_upd')
 
 
 # ====================
