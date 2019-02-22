@@ -92,18 +92,26 @@ in either MARC exchange (.lex) or MARC XML (.xml) format.
         -x        Output files will be MARC XML rather than MARC 21 (.lex)
         --max_size <number|size>
                   Split output
+        --header  Include MetAg headers in MARC XML records
         --help    Show help message and exit.
 
 The output files will either be a MARC exchange format file (with.lex file extensions)
 or MARC XML files (with .xml file extensions) according to whether the -x flag has been set.
 
 If parameter --max_size is specified:
-* --max_size must be a positive integer, optionally followed by the letter K.
+* --max_size must be a positive integer, optionally followed by the letter K;
 * --max_size is EITHER the maximum number of records in an output file OR the (approx.) maximum file size (in KB) if the number has the suffix 'K';
 * Output will be written to a sequence of files with the same name as the input file, but with a suffix indicating its order in the generated output sequence
 * EXCEPT in the special case of --max_size 1 (the file is split into individual records) in which case the output files will be labelled	with the record identifier.
 * Records with duplicate identifiers will be labelled with a _DUPLICATE suffix.
 * Records without identifiers will be labelled with _NO IDENTIFIER.
+
+If parameter --header is specified:
+* MARC XML records will be given a <header> to make them suitable for the Metadata Aggregator.
+* The <header> will include the record identifier.
+* For deleted records, the <header> element will have an @status="deleted" attribute.
+
+NOTE: --header can only be used if -x is also specified.
 
 Input files can be in any of the formats listed below.
 
