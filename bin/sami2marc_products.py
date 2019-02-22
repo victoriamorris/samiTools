@@ -38,6 +38,7 @@ def usage(extended=False):
     print('    -x        Output files will be MARC XML rather than MARC 21 (.lex)')
     print('    --max_size <number|size>')
     print('              Split output')
+    print('    --header  Use MetAg headers')
     print('    --help    Display help message and exit')
     if extended:
         print('\n\nIf parameter --max_size is specified:\n'
@@ -55,6 +56,12 @@ def usage(extended=False):
               '\twith a _DUPLICATE suffix.'
               '\tRecords without identifiers will be labelled \n'
               '\twith _NO IDENTIFIER.')
+        print('\n\nIf parameter --header is specified:\n'
+              '\tMARC XML records will be given a <header> to make them \n'
+              '\tsuitable for the Metadata Aggregator; \n'
+              '\tThe <header> will include the record identifier; \n'
+              '\tFor deleted records, the <header> will have @status="deleted". \n'
+              '\tNOTE: --header can only be used with -x.')
     exit_prompt()
 
 
@@ -66,7 +73,7 @@ def usage(extended=False):
 def main(argv=None):
     if argv is None: name = str(sys.argv[1])
 
-    xml, split = False, False
+    xml, split, header, deleted = False, False, False, False
     opts, args = None, None
     input_path, output_path = None, None
     limit = None
@@ -80,7 +87,7 @@ def main(argv=None):
           'to MARC 21 Bibliographic files in MARC exchange (.lex) or MARC XML format\n')
 
     try:
-        opts, args = getopt.getopt(argv, 'i:o:m:x', ['input_path=', 'output_path=', 'max_size=', 'help'])
+        opts, args = getopt.getopt(argv, 'hi:o:m:x', ['input_path=', 'output_path=', 'max_size=', 'header', 'help'])
     except getopt.GetoptError as err:
         exit_prompt('Error: {}'.format(err))
     if opts is None or not opts:
@@ -90,6 +97,8 @@ def main(argv=None):
             usage(extended=True)
         elif opt == '-x':
             xml = True
+        elif opt in ['-h', '--header']:
+            header = True
         elif opt in ['-i', '--input_path']:
             input_path = arg
         elif opt in ['-o', '--output_path']:
@@ -118,6 +127,9 @@ def main(argv=None):
         try: os.makedirs(output_path)
         except: exit_prompt('Error: Could not parse path to output files')
 
+    if header and not xml:
+        exit_prompt('Error: Option --header cannot be used without -x')
+
     # --------------------
     # Parameters seem OK => start program
     # --------------------
@@ -131,6 +143,8 @@ def main(argv=None):
             split = True
             print('Output file will be split into individual records')
         else: print('Maximum file size : {} {}'.format(str(max_size), 'bytes' if limit == 'size' else 'records'))
+    if header:
+        print('MetAg headers will be used')
 
     # --------------------
     # Iterate through input files
@@ -138,9 +152,16 @@ def main(argv=None):
 
     for file in os.listdir(input_path):
         root, ext = os.path.splitext(file)
-        if ext in ['.xml', '.prn'] or file.endswith(SAMI_SUFFICES):
+        deleted = False
+        if ext in ['.xml', '.prn'] or file.endswith(SAMI_SUFFICES) or any(f in root for f in PRIMO_FLAGS):
+            if any(f in root for f in PRIMO_FLAGS):
+                root = root + ext
+                ext = '.xml'
 
             date_time('Processing file {} ...'.format(str(file)))
+            if '_dels' in root:
+                deleted = True
+                print('File contains deleted records')
 
             # Open input file
             ifile = open(os.path.join(input_path, file), mode='r', encoding='utf-8', errors='replace')
@@ -162,9 +183,16 @@ def main(argv=None):
                         filename = os.path.join(output_path, (record.identifier() or '_NO IDENTIFIER {}'.format(str(record_count))) + '_DUPLICATE {}'.format(str(file_count)) + ext)
                     if xml:
                         current_file = open(filename, 'w', encoding='utf-8', errors='replace')
-                        current_file.write(XML_HEADER)
-                        current_file.write(record.as_xml())
-                        current_file.write('\n</marc:collection>')
+                        if header:
+                            current_file.write(METAG_HEADER)
+                            current_file.write(record.header(deleted=deleted))
+                            if not (deleted or record.deleted):
+                                current_file.write('<metadata>{}\n</metadata>\n'.format(record.as_xml(namespace=True)))
+                            current_file.write('</record>')
+                        else:
+                            current_file.write(XML_HEADER)
+                            current_file.write(record.as_xml())
+                            current_file.write('\n</marc:collection>')
                     else:
                         current_file = open(filename, mode='wb')
                         writer = MARCWriter(current_file)
@@ -187,7 +215,7 @@ def main(argv=None):
 
             if xml:
                 current_file = open(filename, 'w', encoding='utf-8', errors='replace')
-                current_file.write(XML_HEADER)
+                current_file.write(OAI_HEADER if header else XML_HEADER)
             else:
                 current_file = open(filename, mode='wb')
                 writer = MARCWriter(current_file)
@@ -200,10 +228,13 @@ def main(argv=None):
 
                 # Check whether we need to start a new file
                 current_size += len(record.as_xml()) if xml else len(record.as_marc())
-                if ( limit == 'size' and current_size >= max_size ) \
-                        or ( limit == 'number' and record_count_in_file > max_size ):
-                    if xml: current_file.write('\n</marc:collection>')
+                if (limit == 'size' and current_size >= max_size) \
+                        or (limit == 'number' and record_count_in_file > max_size):
+                    if xml:
+                        if header: current_file.write('\n</ListRecords>\n</OAI-PMH>')
+                        else: current_file.write('\n</marc:collection>')
                     current_file.close()
+                    print('{} records processed'.format(str(record_count)), end='\r')
                     print('\nFile {} done'.format(str(current_idx)))
                     current_size = len(record.as_xml()) if xml else len(record.as_marc())
                     record_count_in_file = 0
@@ -212,15 +243,25 @@ def main(argv=None):
                     filename = os.path.join(output_path, root + mid + ext)
                     if xml:
                         current_file = open(filename, 'w', encoding='utf-8', errors='replace')
-                        current_file.write(XML_HEADER)
+                        current_file.write(OAI_HEADER if header else XML_HEADER)
                     else:
                         current_file = open(filename, mode='wb')
                         writer = MARCWriter(current_file)
 
-                if xml: current_file.write(record.as_xml())
+                if xml:
+                    if header:
+                        current_file.write(OAI_RECORD)
+                        current_file.write(record.header(deleted=deleted))
+                        if not (deleted or record.deleted):
+                            current_file.write('<metadata>{}\n</metadata>\n'.format(record.as_xml(namespace=True)))
+                        current_file.write('</record>')
+                    else:
+                        current_file.write(record.as_xml())
                 else: writer.write(record)
 
-            if xml: current_file.write('\n</marc:collection>')
+            if xml:
+                if header: current_file.write('\n</ListRecords>\n</OAI-PMH>')
+                else: current_file.write('\n</marc:collection>')
             print('{} records processed'.format(str(record_count)), end='\r')
             # Close files
             for f in [ifile, current_file]:
