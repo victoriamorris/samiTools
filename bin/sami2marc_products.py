@@ -138,6 +138,7 @@ def main(argv=None):
 
     print('Input folder: {}'.format(input_path))
     print('Output folder: {}'.format(output_path))
+    print('Output format: {}'.format('MARC XML (.xml)' if xml else 'MARC (.lex)'))
     if limit:
         if max_size == 1:
             split = True

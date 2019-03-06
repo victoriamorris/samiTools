@@ -6,6 +6,7 @@
 # ====================
 
 # Import required modules
+from math import log10
 from samiTools.marc_data import *
 
 # Set locale to assist with sorting
@@ -57,20 +58,44 @@ def usage(extended=False):
     print('Records with errors will be written to <ofile>_errors.')
     print('\nOptions')
     print('    --date <yyyymmdd>')
-    print('              split output into two files by specfied date')
-    print('    --tidy    tidy authority files to facilitate load to MetAg')
+    print('              Split output into two files by specfied date')
+    print('    --max_size <number|size>')
+    print('              Split output')
+    print('    --tidy    Tidy authority files to facilitate load to MetAg')
+    print('    --header  Include MetAg headers in MARC XML records')
     print('    --help    Display help message and exit')
+    print('--date and --max_size cannot be used at the same time.')
     if extended:
         print('\n\nIf parameter --date is specified:\n'
               '\tRecords with a created or amended date ealier than \n'
               '\tthe value specified will be written to <ofile>_pre_<date>; \n'
               '\tRecords with a created or amended date equal to or later than \n'
               '\tthe value specified will be written to <ofile>_post_<date>. \n')
+        print('\n\nIf parameter --max_size is specified:\n'
+              '\tmax_size is EITHER the maximum number of records in an output file \n'
+              '\tOR the (approx.) maximum file size (in KB) \n'
+              '\tif the number has the suffix \'K\'; \n\n'
+              '\tOutput will be written to a sequence of files with the same name \n'
+              '\tas the input file, but with a suffix indicating its order in the \n'
+              '\tgenerated output sequence \n\n'
+              '\tEXCEPT in the special case of --max_size 1 \n'
+              '\t(the file is split into individual records) \n'
+              '\tin which case the output files will be labelled \n'
+              '\twith the record identifier.\n '
+              '\tRecords with duplicate identifiers will be labelled \n'
+              '\twith a _DUPLICATE suffix.'
+              '\tRecords without identifiers will be labelled \n'
+              '\twith _NO IDENTIFIER.')
         print('\nIf parameter --tidy is specified:\n'
               '\tIf no 001 is present, one will be created from the first instance of 901 $a; \n'
               '\t904 $a and 905 $a will be combined into a single 904 field ($a and $b); \n'
               '\t906 $a and 907 $a will be combined into a single 906 field ($a and $b); \n'
               '\tCreated and Amended date will be converted from dd/mm/yy to yyyymmdd format. \n')
+        print('\n\nIf parameter --header is specified:\n'
+              '\tMARC XML records will be given a <header> to make them \n'
+              '\tsuitable for the Metadata Aggregator; \n'
+              '\tThe <header> will include the record identifier; \n'
+              '\tNOTE: --header can only be used if the output is MARC XML.')
     exit_prompt()
 
 
@@ -82,8 +107,9 @@ def usage(extended=False):
 def main(argv=None):
     if argv is None: name = str(sys.argv[1])
 
-    xml, tidy = False, False
-    opts, args, date = None, None, None
+    xml, tidy, split, header = False, False, False, False
+    opts, args, date, limit = None, None, None, None
+    max_size = 1024 * 1024 * 1024
 
     print('========================================')
     print('sami2marc_authorities')
@@ -92,7 +118,7 @@ def main(argv=None):
           'from text or .prn format\n'
           'to MARC 21 Authority files in MARC exchange (.lex) or MARC XML format\n')
 
-    try: opts, args = getopt.getopt(argv, 'i:o:d:', ['ifile=', 'ofile=', 'date=', 'tidy', 'help'])
+    try: opts, args = getopt.getopt(argv, 'hi:o:m:d:t', ['ifile=', 'ofile=', 'max_size=', 'header', 'date=', 'tidy', 'help'])
     except getopt.GetoptError as err:
         exit_prompt('Error: {}'.format(err))
     if opts is None or not opts:
@@ -100,21 +126,37 @@ def main(argv=None):
     for opt, arg in opts:
         if opt == '--help':
             usage(extended=True)
-        elif opt == '--tidy':
+        elif opt in ['-h', '--header']:
+            header = True
+        elif opt in ['-t', '--tidy']:
             tidy = True
         elif opt in ['-d', '--date']:
             date = arg
         elif opt in roles:
             files[roles[opt]] = FilePath(arg, roles[opt])
+        elif opt in ['-m', '--max_size']:
+            arg = arg.upper()
+            limit = 'size' if 'K' in arg else 'number'
+            try: max_size = int(re.sub(r'[^0-9]', '', arg))
+            except: exit_prompt('Maximum file size could not be interpreted. \n'
+                                'Please ensure that it is a positive integer, \n'
+                                'optionally followed by the suffix K.')
+            if not max_size >= 1: exit_prompt('Maximum file size could not be interpreted. \n'
+                                              'Please ensure that it is a positive integer, \n'
+                                              'optionally followed by the suffix K.')
+            if limit == 'size': max_size *= 1024
         else:
             exit_prompt('Error: Option {} not recognised'.format(opt))
+
+    if date and limit: exit_prompt('Error: Options --date and --max_size cannot be used at the same time')
 
     for f in ['input', 'output']:
         if not files[f]:
             exit_prompt('Error: No path to {} file has been specified'.format(f))
     if files['output'].ext == '.xml': xml = True
 
-    # Create extra files for MetAg output
+    # Check date format and create extra files for MetAg output
+
     if date:
         if len(re.sub(r'[^0-9]]', '', date)) != 8: exit_prompt('The date parameter must be in the format yyyymmdd')
         try: date = datetime.datetime.strptime(date, '%Y%m%d')
@@ -128,139 +170,164 @@ def main(argv=None):
 
     files['errors'] = FilePath((files['output']).path.replace(files['output'].ext, '_errors{}'.format(files['output'].ext)), 'error output')
 
+    # --------------------
+    # Parameters seem OK => start program
+    # --------------------
+
+    # Display confirmation information about the transformation
+
+    print('Input file: {}'.format(files['input'].path))
+    print('Output file: {}'.format(files['output'].path))
+    print('Output format: {}'.format('MARC XML (.xml)' if xml else 'MARC (.lex)'))
+    if limit:
+        if max_size == 1:
+            split = True
+            print('Output file will be split into individual records')
+        else: print('Maximum file size : {} {}'.format(str(max_size), 'bytes' if limit == 'size' else 'records'))
+    if date:
+        print('\nDate for splitting output: {}'.format(date.strftime('%Y%m%d')))
+    if tidy: print('Output will be tidied for MetAg use.\n')
+    if header: print('MetAg headers will be used')
+
+    # --------------------
+    # Iterate through input files
+    # --------------------
+
     print('\n\nStarting conversion ...')
     print('----------------------------------------')
     print(str(datetime.datetime.now()))
-    if date:
-        print('\nDate for splitting output: {}'.format(date.strftime('%Y%m%d')))
-    if date or tidy: print('Output will be tidied for MetAg use.\n')
 
     ifile = open(files['input'].path, mode='r', encoding='utf-8', errors='replace')
-    for f in files:
-        if f != 'input' and files[f]:
-            if xml:
-                files[f].file_object = open(files[f].path, mode='w', encoding='utf-8', errors='replace')
-                files[f].file_object.write(XML_HEADER)
-            else:
-                files[f].file_object = open(files[f].path, mode='wb')
-                files[f].file_writer = MARCWriter(files[f].file_object)
+    reader = SAMIReader(ifile, reader_type='authorities', tidy=tidy)
+    output_path, root = os.path.split(files['output'].path)
+    root, ext = os.path.splitext(root)
 
-    record_count = 0
-    in_record, in_field, error = False, False, False
-    field_content = ''
-    sid, fmt, level, created, created_by, modified, modified_by, cataloged, source = None, None, None, None, None, None, None, None, None
-    for filelineno, line in enumerate(ifile):
-        line = line.strip('\n')
-        if line.startswith('XX'):
+    # Special case if file is to be split into separate records
+    if split:
+        record_count = 0
+
+        for record in reader:
             record_count += 1
             if record_count % 100 == 0:
-                print('\r{0} SAMI records processed'.format(str(record_count)), end='\r')
-
-            # Write current record
-            if in_record:
-                if in_field:
-                    record.add_ordered_field(line_to_field(field_content))
-                if tidy:
-                    if '001' not in record:
-                        if sid != '':
-                            record.add_ordered_field(Field(tag='001', data=sid))
-                        else:
-                            print('Failed to add 001')
-                            error = True
-
-                if error:
-                    if xml: files['errors'].file_object.write(record.as_xml())
-                    else: files['errors'].file_writer.write(record)
+                print('{} records processed'.format(str(record_count)), end='\r')
+            filename = os.path.join(output_path, (record.identifier() or '_NO IDENTIFIER {}'.format(str(record_count))) + ext)
+            file_count = 0
+            while os.path.isfile(filename):
+                file_count += 1
+                filename = os.path.join(output_path, (record.identifier() or '_NO IDENTIFIER {}'.format(str(record_count))) + '_DUPLICATE {}'.format(str(file_count)) + ext)
+            if xml:
+                current_file = open(filename, 'w', encoding='utf-8', errors='replace')
+                if header:
+                    current_file.write(METAG_HEADER)
+                    current_file.write(record.header())
+                    current_file.write('<metadata>{}\n</metadata>\n'.format(record.as_xml(namespace=True)))
+                    current_file.write('</record>')
                 else:
-                    if xml: files['output'].file_object.write(record.as_xml())
-                    else: files['output'].file_writer.write(record)
-                    if date:
-                        fmt = '%Y%m%d' if tidy else '%d/%m/%Y'
-                        try:
-                            f = 'post' if (created != 'NEVER' and datetime.datetime.strptime(created, fmt) >= date) \
-                                          or (modified != 'NEVER' and datetime.datetime.strptime(modified, fmt) >= date) else 'pre'
-                        except:
-                            print('\nError parsing date')
-                        else:
-                            if xml: files[f].file_object.write(record.as_xml())
-                            else: files[f].file_writer.write(record)
-
-            # Start new record
-            record = MARCRecord()
-            in_record, in_field, error = True, False, False
-            field_content = ''
-            sid, fmt, level, created, created_by, modified, modified_by, cataloged, source = line.rstrip('\t').split('\t\t')
-            if tidy:
-                if created != 'NEVER':
-                    try: created = datetime.datetime.strftime(datetime.datetime.strptime(created, '%d/%m/%Y'), '%Y%m%d')
-                    except:
-                        print('Error parsing created date')
-                        error = True
-                if modified != 'NEVER':
-                    try: modified = datetime.datetime.strftime(datetime.datetime.strptime(modified, '%d/%m/%Y'), '%Y%m%d')
-                    except:
-                        print('Error parsing modified date')
-                        error = True
-            record.add_field(Field(tag='901', indicators=[' ', ' '], subfields=['a', 'id: ' + sid]))
-            record.add_field(Field(tag='902', indicators=[' ', ' '], subfields=['a', 'fmt: ' + fmt]))
-            record.add_field(Field(tag='903', indicators=[' ', ' '], subfields=['a', 'level: ' + level]))
-            if tidy:
-                record.add_field(Field(tag='904', indicators=[' ', ' '], subfields=['a', 'created: ' + created, 'b', 'created_by: ' + created_by]))
-                record.add_field(Field(tag='906', indicators=[' ', ' '], subfields=['a', 'modified: ' + modified, 'b', 'modified_by: ' + modified_by]))
+                    current_file.write(XML_HEADER)
+                    current_file.write(record.as_xml())
+                    current_file.write('\n</marc:collection>')
             else:
-                record.add_field(Field(tag='904', indicators=[' ', ' '], subfields=['a', 'created: ' + created]))
-                record.add_field(Field(tag='905', indicators=[' ', ' '], subfields=['a', 'created_by: ' + created_by]))
-                record.add_field(Field(tag='906', indicators=[' ', ' '], subfields=['a', 'modified: ' + modified]))
-                record.add_field(Field(tag='907', indicators=[' ', ' '], subfields=['a', 'modified_by: ' + modified_by]))
-            record.add_field(Field(tag='908', indicators=[' ', ' '], subfields=['a', 'cataloged: ' + cataloged]))
-            record.add_field(Field(tag='909', indicators=[' ', ' '], subfields=['a', 'source: ' + source]))
+                current_file = open(filename, mode='wb')
+                writer = MARCWriter(current_file)
+                writer.write(record)
 
-        elif in_record:
-            line = line.strip()
-            if re.search(r'^[0-9]{3}:', line):
-                if in_field:
-                    record.add_ordered_field(line_to_field(field_content))
-                in_field = True
-                field_content = line
+    # All other cases
+    else:
+        FMT = None
+        record_count, record_count_in_file = 0, 0
+        current_idx, current_size = 0, 0
 
-            else:
-                field_content += line
+        if limit == 'size':
+            FMT = ".%%0%dd" % (int(log10(os.path.getsize(files['input'].path) / max_size)) + 1)
 
-    # Write final record
-    if in_record:
-        if in_field:
-            record.add_ordered_field(line_to_field(field_content))
-        if '001' not in record:
-            if sid != '':
-                record.add_ordered_field(Field(tag='001', data=sid))
-            else: error = True
-        if error:
-            if xml: files['errors'].file_object.write(record.as_xml())
-            else: files['errors'].file_writer.write(record)
-        else:
-            if xml: files['output'].file_object.write(record.as_xml())
-            else: files['output'].file_writer.write(record)
-            if date:
-                try:
-                    fmt = '%Y%m%d' if tidy else '%d/%m/%Y'
-                    f = 'post' if (created != 'NEVER' and datetime.datetime.strptime(created, fmt) >= date) \
-                                  or (modified != 'NEVER' and datetime.datetime.strptime(modified, fmt) >= date) else 'pre'
-                except Exception as e:
-                    print('\nError parsing date')
-                    print(str(e))
-                    print(created)
-                    print(modified)
-                else:
-                    if xml: files[f].file_object.write(record.as_xml())
-                    else: files[f].file_writer.write(record)
+        mid = FMT % current_idx if limit == 'size' else '.{}'.format(str(current_idx)) if limit == 'number' else ''
+        filename = os.path.join(output_path, root + mid + ext)
 
-    # Close XML record
-    if xml:
         for f in files:
-            if f != 'input' and files[f]:
-                files[f].file_object.write('\n</marc:collection>')
+            if f not in ('input', 'output') and files[f]:
+                if xml:
+                    files[f].file_object = open(files[f].path, mode='w', encoding='utf-8', errors='replace')
+                    files[f].file_object.write(XML_HEADER)
+                else:
+                    files[f].file_object = open(files[f].path, mode='wb')
+                    files[f].file_writer = MARCWriter(files[f].file_object)
+
+        if xml:
+            current_file = open(filename, 'w', encoding='utf-8', errors='replace')
+            current_file.write(OAI_HEADER if header else XML_HEADER)
+        else:
+            current_file = open(filename, mode='wb')
+            writer = MARCWriter(current_file)
+
+        for record in reader:
+            record_count += 1
+            record_count_in_file += 1
+            if record_count % 100 == 0:
+                print('{} records processed'.format(str(record_count)), end='\r')
+
+            # Check whether we need to start a new file
+            current_size += len(record.as_xml()) if xml else len(record.as_marc())
+            if (limit == 'size' and current_size >= max_size) \
+                    or (limit == 'number' and record_count_in_file > max_size):
+                if xml:
+                    if header: current_file.write('\n</ListRecords>\n</OAI-PMH>')
+                    else: current_file.write('\n</marc:collection>')
+                current_file.close()
+                print('{} records processed'.format(str(record_count)), end='\r')
+                print('\nFile {} done'.format(str(current_idx)))
+                current_size = len(record.as_xml()) if xml else len(record.as_marc())
+                record_count_in_file = 0
+                current_idx += 1
+                mid = FMT % current_idx if limit == 'size' else '.{}'.format(
+                    str(current_idx)) if limit == 'number' else ''
+                filename = os.path.join(output_path, root + mid + ext)
+                if xml:
+                    current_file = open(filename, 'w', encoding='utf-8', errors='replace')
+                    current_file.write(OAI_HEADER if header else XML_HEADER)
+                else:
+                    current_file = open(filename, mode='wb')
+                    writer = MARCWriter(current_file)
+
+            if record.is_bad():
+                if xml: files['errors'].file_object.write(record.as_xml())
+                else: files['errors'].file_writer.write(record)
+            else:
+                # Write record to main output file
+                if xml:
+                    if header:
+                        current_file.write(OAI_RECORD)
+                        current_file.write(record.header())
+                        current_file.write('<metadata>{}\n</metadata>\n'.format(record.as_xml(namespace=True)))
+                        current_file.write('</record>')
+                    else:
+                        current_file.write(record.as_xml())
+                else:
+                    writer.write(record)
+                # If splitting by date, write record to appropriate output file
+                if date:
+                    fmt = '%Y%m%d' if tidy else '%d/%m/%Y'
+                    try:
+                        f = 'post' if (record.created != 'NEVER' and datetime.datetime.strptime(record.created, fmt) >= date) \
+                                      or (record.modified != 'NEVER' and datetime.datetime.strptime(record.modified,  fmt) >= date) else 'pre'
+                    except: print('\nError parsing date')
+                    else:
+                        if xml: files[f].file_object.write(record.as_xml())
+                        else: files[f].file_writer.write(record)
+
+    # Write closing elements in files
+    if xml:
+        if header: current_file.write('\n</ListRecords>\n</OAI-PMH>')
+        else: current_file.write('\n</marc:collection>')
+        for f in files:
+            if f != 'input' and files[f] and files[f].file_object:
+                if header: files[f].file_object.write('\n</ListRecords>\n</OAI-PMH>')
+                else: files[f].file_object.write('\n</marc:collection>')
+
+    print('{} records processed'.format(str(record_count)), end='\r')
 
     # Close files
+    for f in [ifile, current_file]:
+        f.close()
     for f in files:
         try: files[f].file_object.close()
         except: pass
