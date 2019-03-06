@@ -101,11 +101,12 @@ class RecordWritingError(Exception):
 
 
 class SAMIReader(object):
-    def __init__(self, target, reader_type):
+    def __init__(self, target, reader_type, tidy=False):
         if hasattr(target, 'read') and callable(target.read):
             self.file_handle = target
         self.reader_type = reader_type
         self.deleted = '_dels' in str(target)
+        self.tidy = tidy
 
     def __iter__(self):
         return self
@@ -119,7 +120,9 @@ class SAMIReader(object):
         chunk = ''
         line = self.file_handle.readline()
         if not line: raise StopIteration
-        while chunk == '' and line and (self.new_record(line) or 'xmlns:xsi' in line):
+        while chunk == '' and line and (self.new_record(line)
+                                        or 'xmlns:xsi' in line
+                                        or (self.reader_type == 'authorities' and (line.startswith(('.', '$')) or line.strip() == ''))):
             line = self.file_handle.readline()
             if not line: break
         while line and not self.new_record(line):
@@ -127,9 +130,12 @@ class SAMIReader(object):
             line = self.file_handle.readline()
             if not line: break
         if not chunk: raise StopIteration
-        return SAMIRecord(chunk, record_type=self.reader_type)
+        return SAMIRecord(data=chunk, record_type=self.reader_type, tidy=self.tidy)
 
     def new_record(self, line):
+        if self.reader_type == 'authorities':
+            if line.startswith('.end') or line.strip() == '': return True
+            return False
         if self.reader_type == 'prn':
             if any(s in line for s in ['<?xml version', '<title>', '<report>', '</report>', '<dateFormat>', '<catalog>']): return True
             if re.search(r'^<dateCreated>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}</dateCreated>$', line.strip()): return True
@@ -150,13 +156,69 @@ class SAMIReader(object):
 
 class SAMIRecord(object):
 
-    def __init__(self, data, record_type):
+    def __init__(self, data, record_type, tidy=False):
         self.record_type = record_type
         self.record = MARCRecord()
         self.data = data
         self.deleted = '<header status="deleted">' in data
+        self.tidy = tidy
+        self.error = False
+        self.sid, self.fmt, self.level, self.created, self.created_by, self.modified, self.modified_by, self.cataloged, self.source = None, None, None, None, None, None, None, None, None
 
-        if self.record_type == 'prn':
+        if self.record_type == 'authorities':
+            self.data = re.sub(r'\n[ ]{4,}', ' ', self.data)
+            self.sid, self.fmt, self.level, self.created, self.created_by, self.modified, self.modified_by, self.cataloged, self.source = data.split('\n', 1)[0].rstrip('\t').split('\t\t')
+
+            if self.tidy:
+                if self.created != 'NEVER':
+                    try: self.created = datetime.datetime.strftime(datetime.datetime.strptime(self.created, '%d/%m/%Y'), '%Y%m%d')
+                    except:
+                        print('Error parsing created date')
+                        self.error = True
+                if self.modified != 'NEVER':
+                    try: self.modified = datetime.datetime.strftime(datetime.datetime.strptime(self.modified, '%d/%m/%Y'), '%Y%m%d')
+                    except:
+                        print('Error parsing modified date')
+                        self.error = True
+
+            self.record.add_ordered_field(Field(tag='901', indicators=[' ', ' '], subfields=['a', 'id: ' + self.sid]))
+            self.record.add_ordered_field(Field(tag='902', indicators=[' ', ' '], subfields=['a', 'fmt: ' + self.fmt]))
+            self.record.add_ordered_field(Field(tag='903', indicators=[' ', ' '], subfields=['a', 'level: ' + self.level]))
+            if self.tidy:
+                self.record.add_ordered_field(Field(tag='904', indicators=[' ', ' '], subfields=['a', 'created: ' + self.created, 'b', 'created_by: ' + self.created_by]))
+                self.record.add_ordered_field(Field(tag='906', indicators=[' ', ' '], subfields=['a', 'modified: ' + self.modified, 'b', 'modified_by: ' + self.modified_by]))
+            else:
+                self.record.add_ordered_field(Field(tag='904', indicators=[' ', ' '], subfields=['a', 'created: ' + self.created]))
+                self.record.add_ordered_field(Field(tag='905', indicators=[' ', ' '], subfields=['a', 'created_by: ' + self.created_by]))
+                self.record.add_ordered_field(Field(tag='906', indicators=[' ', ' '], subfields=['a', 'modified: ' + self.modified]))
+                self.record.add_ordered_field(Field(tag='907', indicators=[' ', ' '], subfields=['a', 'modified_by: ' + self.modified_by]))
+            self.record.add_ordered_field(Field(tag='908', indicators=[' ', ' '], subfields=['a', 'cataloged: ' + self.cataloged]))
+            self.record.add_ordered_field(Field(tag='909', indicators=[' ', ' '], subfields=['a', 'source: ' + self.source]))
+
+            for field in re.findall(r'(?<=[^\n])[ ]+([^\s]{3}):[ ]+(\|.*?)(?=[$|\n])', self.data):
+                tag, content = field[0], field[1]
+                try: test = int(tag)
+                except: test = None
+                if tag == '000' or (test and test < 10) or tag in ALEPH_CONTROL_FIELDS:
+                    try: f = Field(tag=tag, data=content.split('|a', 1)[1].strip())
+                    except: f = Field(tag=tag, data=content.strip())
+                else:
+                    subfields = []
+                    for s in content.split('|')[1:]:
+                        try: subfields.extend([s[0], s[1:]])
+                        except: pass
+                    f = Field(tag=tag, indicators=[' ', ' '], subfields=subfields)
+                self.record.add_ordered_field(f)
+
+            if self.tidy:
+                if '001' not in self.record:
+                    if self.sid != '':
+                        self.record.add_ordered_field(Field(tag='001', data=self.sid.strip()))
+                    else:
+                        print('Failed to add 001')
+                        self.error = True
+
+        elif self.record_type == 'prn':
             for field in re.findall(r'<marcEntry tag="(.*?)" label="(.*?)" ind="(.*?)">(.*?)</marcEntry>', self.data):
                 tag, label, ind1, ind2, content = field[0], field[1], field[2][0], field[2][1], field[3]
                 try: test = int(tag)
@@ -250,9 +312,9 @@ class SAMIRecord(object):
         return str(self.record)
 
     def identifier(self):
-        try: return self.record['001'].data.replace('CKEY', '').strip()
+        try: return clean_text(self.record['001'].data.replace('CKEY', '').strip())
         except:
-            try: return re.search(r'<identifier>(.*?)</identifier>', self.data).group(1).strip()
+            try: return clean_text(re.search(r'<identifier>(.*?)</identifier>', self.data).group(1).strip())
             except: return None
 
     def datestamp(self):
@@ -268,6 +330,9 @@ class SAMIRecord(object):
         return '\n<header>\n' \
                '<identifier>{}</identifier>\n' \
                '</header>\n'.format(self.identifier())
+
+    def is_bad(self):
+        return self.error
 
 
 class MARCReader(object):
@@ -598,7 +663,7 @@ class Field(object):
 # ====================
 
 
-def line_to_field(field_content):
+'''def line_to_field(field_content):
     field_content = field_content.strip()
     tag = field_content[0:3]
     try: test = int(tag)
@@ -609,4 +674,4 @@ def line_to_field(field_content):
     for s in field_content.split('|')[1:]:
         try: subfields.extend([s[0], s[1:]])
         except: pass
-    return Field(tag=tag, indicators=[' ', ' '], subfields=subfields)
+    return Field(tag=tag, indicators=[' ', ' '], subfields=subfields)'''
