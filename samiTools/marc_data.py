@@ -141,7 +141,7 @@ class SAMIReader(object):
             if re.search(r'^<dateCreated>[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}</dateCreated>$', line.strip()): return True
             return False
         if self.reader_type == 'xml':
-            if any(s in line for s in ['<record xmlns="http://www.loc.gov/mods/v3">', '<?xml version', '<OAI-PMH', '</OAI-PMH>',
+            if any(s in line for s in ['<record xmlns="http://www.loc.gov/mods/v3">', '<record xmlns:rdf=', '<?xml version', '<OAI-PMH', '</OAI-PMH>',
                                        '<ListRecords>', '</ListRecords>']): return True
             if self.deleted and any(s in line for s in ['<record>',
                                                         'xmlns="http://www.openarchives.org/OAI/2.0/"',
@@ -257,22 +257,22 @@ class SAMIRecord(object):
                     self.record.add_ordered_field(f)
 
         elif self.record_type == 'xml':
-            for field in re.findall(r'<controlfield tag="(.*?)">(.*?)</controlfield>', self.data, re.M):
+            for field in re.findall(r'<(?:marc:)?controlfield tag="(.*?)">(.*?)</(?:marc:)?controlfield>', self.data, re.M):
                 tag, data = field[0], field[1]
                 subfields = []
-                for s in re.findall(r'<subfield code="(.)">(.*?)</subfield>', data):
+                for s in re.findall(r'<(?:marc:)?subfield code="(.)">(.*?)</(?:marc:)?subfield>', data):
                     try: subfields.extend([s[0], s[1]])
                     except: pass
                 f = Field(tag=tag, data=data)
                 self.record.add_ordered_field(f)
             self.data = ''.join(line for line in self.data.split('\n'))
-            for field in re.findall(r'<datafield tag="(.*?)" ind1="(.?)" ind2="(.?)">(.*?)</datafield>', self.data,
+            for field in re.findall(r'<(?:marc:)?datafield tag="(.*?)" ind1="(.?)" ind2="(.?)">(.*?)</(?:marc:)?datafield>', self.data,
                                     re.M):
                 tag, ind1, ind2, data = field[0], field[1], field[2], field[3]
                 if ind1 == '': ind1 = ' '
                 if ind2 == '': ind2 = ' '
                 subfields = []
-                for s in re.findall(r'<subfield code="(.)">(.*?)</subfield>', data):
+                for s in re.findall(r'<(?:marc:)?subfield code="(.)">(.*?)</(?:marc:)?subfield>', data):
                     try: subfields.extend([s[0], s[1]])
                     except: pass
                 f = Field(tag=tag, indicators=[ind1, ind2], subfields=subfields)
@@ -656,22 +656,3 @@ class Field(object):
         for subfield in self:
             xml += '\n\t\t\t<marc:subfield code="{}">{}</marc:subfield>'.format(subfield[0], clean_text(subfield[1].strip()))
         return xml + '\n\t\t</marc:datafield>'
-
-
-# ====================
-#      Functions
-# ====================
-
-
-'''def line_to_field(field_content):
-    field_content = field_content.strip()
-    tag = field_content[0:3]
-    try: test = int(tag)
-    except: test = None
-    if (test and test < 10) or tag in ALEPH_CONTROL_FIELDS or tag == '000':
-        return Field(tag=tag, data=field_content.split('|a', 1)[1])
-    subfields = []
-    for s in field_content.split('|')[1:]:
-        try: subfields.extend([s[0], s[1:]])
-        except: pass
-    return Field(tag=tag, indicators=[' ', ' '], subfields=subfields)'''
