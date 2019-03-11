@@ -38,7 +38,10 @@ Converts SAMI records for **authorities** to MARC 21 Authority
 in either MARC exchange (`.lex`) or MARC XML (`.xml`) format.
 ```
 Usage: sami2marc_authorities.exe -i <ifile> -o <ofile>
+                                [--date <yyyymmdd>|--max_size <number|size>]
+                                [--tidy] [--header]
 
+Arguments:
     -i    path to Input file
     -o    path to Output file
 
@@ -46,13 +49,16 @@ Options:
     --date <yyyymmdd>
               Split output into two files by specified date.
     --max_size <number|size>
-              Split output
+              Split output by size or number of records
+NOTE: --date and --max_size cannot be used at the same time.
+
+Flags:
     --tidy    Tidy authority files to facilitate load to MetAg.
     --header  Include MetAg headers in MARC XML records
     --help    Show help message and exit.
-    NOTE: --date and --max_size cannot be used at the same time.
+
 ```
-Input files must be SAMI Authority files in **text** format; the files should have `.txt` or `.prn` file extensions.
+Input files must be SAMI Authority files in **text** format (with `.txt` or `.prn` file extensions) or **MARC XML** format (with `.xml` file extensions).
 
 The output file will either be a MARC exchange format file (with a `.lex` file extension)
 or a MARC XML file (with an `.xml` file extension)
@@ -90,8 +96,15 @@ If parameter --header is specified:
 
 **NOTE: `--header` can only be used if the output is MARC XML.**
 
-##### Example SAMI Authority record:
-(may have a `.prn` file extension)
+Input files can be in any of the formats listed below.
+
+##### SAMI text format
+
+The format of Authority records exported directly from SAMI.
+May have `.txt` or `.prn` file extensions.
+
+###### Example record
+
 ```
 XX246721        		NAME		AUTHORIZED		9/11/2016		JCOLLIER  		9/11/2016		JCOLLIER  		NEVER
 000:   |az n  n a
@@ -101,20 +114,113 @@ XX246721        		NAME		AUTHORIZED		9/11/2016		JCOLLIER  		9/11/2016		JCOLLIER  
 312:   |ahttp://www.bach-cantatas.com/Bio/Wright-David.htm
 680:   |aharpsichord
 ```
+
+##### XML
+
+An XML format harvested via OAI-PMH, or created during a previous iteration of the same script, using the `--header` option.
+
+###### Example record
+
+```
+<record xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:marc="http://www.loc.gov/MARC21/slim" xmlns:bl="http://www.bl.uk/schemas/digitalobject/entities#" xmlns:blit="http://bl.uk/namespaces/blit">
+    <header>
+        <identifier>XX1</identifier>
+    </header>
+    <metadata>
+        <marc:record xsi:schemaLocation="http://www.loc.gov/MARC21/slim http://www.loc.gov/standards/marcxml/schema/MARC21slim.xsd">
+            <marc:leader>00844     2200313   4500</marc:leader>
+            <marc:controlfield tag="000">a</marc:controlfield>
+            <marc:controlfield tag="001">XX1</marc:controlfield>
+            <marc:datafield tag="024" ind1=" " ind2=" ">
+                <marc:subfield code="a">0000 0001 2128 5074</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="100" ind1=" " ind2=" ">
+                <marc:subfield code="a">Corea, Chick,</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="300" ind1=" " ind2=" ">
+                <marc:subfield code="a">pn</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="312" ind1=" " ind2=" ">
+                <marc:subfield code="a">NGJ</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="312" ind1=" " ind2=" ">
+                <marc:subfield code="a">http://isni.org/isni/0000000121285074 (data confidence 50)</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="500" ind1=" " ind2=" ">
+                <marc:subfield code="a">Chick Corea Quartet</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="500" ind1=" " ind2=" ">
+                <marc:subfield code="a">Chick Corea Trio</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="500" ind1=" " ind2=" ">
+                <marc:subfield code="a">Circle (Group)</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="500" ind1=" " ind2=" ">
+                <marc:subfield code="a">Origin (Group)</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="500" ind1=" " ind2=" ">
+                <marc:subfield code="a">Return To Forever</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="500" ind1=" " ind2=" ">
+                <marc:subfield code="a">Chick Corea Elektric Band</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="680" ind1=" " ind2=" ">
+                <marc:subfield code="a">Jazz keyboardist, composer</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="901" ind1=" " ind2=" ">
+                <marc:subfield code="a">id: XX1</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="902" ind1=" " ind2=" ">
+                <marc:subfield code="a">fmt: NAME</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="903" ind1=" " ind2=" ">
+                <marc:subfield code="a">level: AUTHORIZED</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="904" ind1=" " ind2=" ">
+                <marc:subfield code="a">created: 6/8/1996</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="905" ind1=" " ind2=" ">
+                <marc:subfield code="a">created_by:</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="906" ind1=" " ind2=" ">
+                <marc:subfield code="a">modified: 19/1/2016</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="907" ind1=" " ind2=" ">
+                <marc:subfield code="a">modified_by: IDAVIS</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="908" ind1=" " ind2=" ">
+                <marc:subfield code="a">cataloged: 19/1/2016</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="909" ind1=" " ind2=" ">
+                <marc:subfield code="a">source:</marc:subfield>
+            </marc:datafield>
+            <marc:datafield tag="961" ind1=" " ind2=" ">
+                <marc:subfield code="a">Corea, Chick,</marc:subfield>
+            </marc:datafield>
+        </marc:record>
+    </metadata>
+</record>
+```
+
 #### sami2marc_products
 
 Converts SAMI records for **products** (words, reocordings, etc.) to MARC 21 Bibliographic
 in either MARC exchange (`.lex`) or MARC XML (`.xml`) format.
 ```
 Usage: sami2marc_products.exe -i <input_path> -o <output_path>
+                            [--max_size <number|size>]
+                            [-x] [--header]
 
+Arguments:
     -i    path to FOLDER containing Input files
     -o    path to FOLDER to contain Output files
 
 Options:
-    -x        Output files will be MARC XML rather than MARC 21 (.lex)
     --max_size <number|size>
-              Split output
+              Split output by size or number of records
+
+Flags:
+    -x        Output files will be MARC XML rather than MARC 21 (.lex)
     --header  Include MetAg headers in MARC XML records
     --help    Show help message and exit.
 ```
@@ -187,7 +293,7 @@ An XML format exported directly from SAMI.
 ```
 ##### XML
 
-An XML format harvested via OAI-PMH.
+An XML format harvested via OAI-PMH, or created during a previous iteration of the same script, using the `--header` option.
 
 ###### Example record
 ```
