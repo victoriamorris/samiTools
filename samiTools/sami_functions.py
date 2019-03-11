@@ -14,6 +14,7 @@ import os
 import re
 import string
 import sys
+import textwrap
 import unicodedata
 # from samiTools.marc_data import *
 
@@ -48,7 +49,7 @@ class FilePath:
 
     def set_path(self, path):
         self.path = path
-        expected_ext = ['.txt', '.prn'] if self.function == 'input' else ['.lex', '.xml']
+        expected_ext = ['.txt', '.prn', '.xml'] if self.function == 'input' else ['.lex', '.xml']
         if not path or path == '':
             exit_prompt('Error: Could not parse path to {} file'.format(self.function))
         try:
@@ -65,6 +66,10 @@ class FilePath:
 # ====================
 #  General Functions
 # ====================
+
+
+def print_opt(o, v, indent=5):
+    print('{}{:<10}  {:<40}'.format(' ' * indent, o, textwrap.fill(v, width=60 - indent, subsequent_indent=' ' * (indent + 12))))
 
 
 def date_time(message='All processing complete'):
@@ -94,4 +99,4 @@ def exit_prompt(message=None):
 def clean_text(s):
     """Function to remove control characters and escape invalid HTML characters <>&"""
     if s is None or not s: return None
-    return html.escape(re.sub(r'[\u0000-\u001F\u007F-\u009F]', '', s))
+    return html.escape(re.sub(r'[\u0000-\u001F\u007F-\u009F]', '', html.unescape(s)))
