@@ -41,6 +41,24 @@ roles = {
     '--ofile':      'output',
     }
 
+
+ARGUMENTS = OrderedDict([
+    ('-i', 'path to Input file'),
+    ('-o', 'path to Output file'),
+])
+
+OPTIONS = OrderedDict([
+    ('--date', 'Split output into two files by specified date'),
+    ('--max_size', 'Split output by size or number of records'),
+])
+
+FLAGS = OrderedDict([
+    ('--tidy', 'Tidy authority files to facilitate load to MetAg'),
+    ('--header', 'Include MetAg headers in MARC XML records'),
+    ('--help', 'Display help message and exit'),
+])
+
+
 # ====================
 #      Functions
 # ====================
@@ -48,54 +66,61 @@ roles = {
 
 def usage(extended=False):
     """Function to print information about the program"""
-    print('Correct syntax is:')
-    print('sami2marc_authorities -i <ifile> -o <ofile>')
-    print('    -i    path to Input file')
-    print('    -o    path to Output file')
-    print('\nUse quotation marks (") around arguments which contain spaces')
-    print('\nInput file should be SAMI Authorities file (.txt or .prn)')
-    print('\nOutput file should be either MARC exchange (.lex) or MARC XML (.xml)')
-    print('Records with errors will be written to <ofile>_errors.')
-    print('\nOptions')
-    print('    --date <yyyymmdd>')
-    print('              Split output into two files by specfied date')
-    print('    --max_size <number|size>')
-    print('              Split output')
-    print('    --tidy    Tidy authority files to facilitate load to MetAg')
-    print('    --header  Include MetAg headers in MARC XML records')
-    print('    --help    Display help message and exit')
+    print('\nCorrect syntax is:\n')
+    print('sami2marc_authorities -i <ifile> -o <ofile>'
+          '\n\t\t\t[--date <yyyymmdd>|--max_size <number|size>]'
+          '\n\t\t\t[--tidy] [--header]')
+    print('\nArguments:')
+    for o in ARGUMENTS:
+        print_opt(o, ARGUMENTS[o])
+    print("""\
+    
+Use quotation marks (") around arguments which contain spaces
+Input file should be SAMI Authorities files in .xml, .prn or text format
+Output file should be either MARC exchange (.lex) or MARC XML (.xml)
+Records with errors will be written to <ofile>_errors.\
+
+""")
+    print('Options:')
+    for o in OPTIONS:
+        print_opt(o, OPTIONS[o])
     print('--date and --max_size cannot be used at the same time.')
+    print('\nFlags:')
+    for o in FLAGS:
+        print_opt(o, FLAGS[o])
     if extended:
-        print('\n\nIf parameter --date is specified:\n'
-              '\tRecords with a created or amended date ealier than \n'
-              '\tthe value specified will be written to <ofile>_pre_<date>; \n'
-              '\tRecords with a created or amended date equal to or later than \n'
-              '\tthe value specified will be written to <ofile>_post_<date>. \n')
-        print('\n\nIf parameter --max_size is specified:\n'
-              '\tmax_size is EITHER the maximum number of records in an output file \n'
-              '\tOR the (approx.) maximum file size (in KB) \n'
-              '\tif the number has the suffix \'K\'; \n\n'
-              '\tOutput will be written to a sequence of files with the same name \n'
-              '\tas the input file, but with a suffix indicating its order in the \n'
-              '\tgenerated output sequence \n\n'
-              '\tEXCEPT in the special case of --max_size 1 \n'
-              '\t(the file is split into individual records) \n'
-              '\tin which case the output files will be labelled \n'
-              '\twith the record identifier.\n '
-              '\tRecords with duplicate identifiers will be labelled \n'
-              '\twith a _DUPLICATE suffix.'
-              '\tRecords without identifiers will be labelled \n'
-              '\twith _NO IDENTIFIER.')
-        print('\nIf parameter --tidy is specified:\n'
-              '\tIf no 001 is present, one will be created from the first instance of 901 $a; \n'
-              '\t904 $a and 905 $a will be combined into a single 904 field ($a and $b); \n'
-              '\t906 $a and 907 $a will be combined into a single 906 field ($a and $b); \n'
-              '\tCreated and Amended date will be converted from dd/mm/yy to yyyymmdd format. \n')
-        print('\n\nIf parameter --header is specified:\n'
-              '\tMARC XML records will be given a <header> to make them \n'
-              '\tsuitable for the Metadata Aggregator; \n'
-              '\tThe <header> will include the record identifier; \n'
-              '\tNOTE: --header can only be used if the output is MARC XML.')
+        print("""\
+
+If parameter --date is specified:
+    Records with a created or amended date ealier than the value specified 
+    will be written to <ofile>_pre_<date>;
+    Records with a created or amended date equal to or later than the value 
+    specified will be written to <ofile>_post_<date>.
+    
+If parameter --max_size is specified:
+    max_size is EITHER the maximum number of records in an output file 
+    OR the (approx) maximum file size (in KB) if the number has the suffix 'K';
+    Output will be written to a sequence of files with the same name as the 
+    input file, but with a suffix indicating its order in the generated 
+    output sequence
+    EXCEPT in the special case of --max_size 1 (the file is split into 
+    individual records) in which case the output files will be labelled with 
+    the record identifier;
+    Records with duplicate identifiers will be labelled with _DUPLICATE;
+    Records without identifiers will be labelled with _NO IDENTIFIER.
+    
+If parameter --tidy is specified:
+    If no 001 is present, one will be created from the first 901 $a;
+    904 $a and 905 $a will be combined into a single 904 field ($a and $b);
+    906 $a and 907 $a will be combined into a single 906 field ($a and $b);
+    Created and Amended date will be converted from dd/mm/yy to yyyymmdd format.
+    
+If parameter --header is specified:
+    MARC XML records will be given a <header> to make them suitable for the 
+    Metadata Aggregator;
+    The <header> will include the record identifier;
+    NOTE: --header can only be used if the output is MARC XML.\
+    """)
     exit_prompt()
 
 
@@ -113,10 +138,11 @@ def main(argv=None):
 
     print('========================================')
     print('sami2marc_authorities')
-    print('========================================')
-    print('\nThis program converts SAMI AUTHORITY files\n'
-          'from text or .prn format\n'
-          'to MARC 21 Authority files in MARC exchange (.lex) or MARC XML format\n')
+    print('========================================\n')
+    print("""\
+This program converts SAMI AUTHORITY files from text, .prn, or XML format
+to MARC 21 Authority files in MARC exchange (.lex) or MARC XML format\
+""")
 
     try: opts, args = getopt.getopt(argv, 'hi:o:m:d:t', ['ifile=', 'ofile=', 'max_size=', 'header', 'date=', 'tidy', 'help'])
     except getopt.GetoptError as err:
@@ -198,7 +224,7 @@ def main(argv=None):
     print(str(datetime.datetime.now()))
 
     ifile = open(files['input'].path, mode='r', encoding='utf-8', errors='replace')
-    reader = SAMIReader(ifile, reader_type='authorities', tidy=tidy)
+    reader = SAMIReader(ifile, reader_type='xml' if files['input'].ext == '.xml' else 'authorities', tidy=tidy)
     output_path, root = os.path.split(files['output'].path)
     root, ext = os.path.splitext(root)
 

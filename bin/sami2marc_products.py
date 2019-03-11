@@ -22,46 +22,74 @@ __status__ = '4 - Beta Development'
 
 
 # ====================
+#   Global variables
+# ====================
+
+
+ARGUMENTS = OrderedDict([
+    ('-i', 'path to FOLDER containing Input files'),
+    ('-o', 'path to FOLDER containing Output files'),
+])
+
+OPTIONS = OrderedDict([
+    ('--max_size', 'Split output by size or number of records'),
+])
+
+FLAGS = OrderedDict([
+    ('-x', 'Output files will be MARC XML rather than MARC 21 (.lex)'),
+    ('--header', 'Include MetAg headers in MARC XML records'),
+    ('--help', 'Display help message and exit'),
+])
+
+
+# ====================
 #      Functions
 # ====================
 
 
 def usage(extended=False):
     """Function to print information about the program"""
-    print('Correct syntax is:')
-    print('sami2marc_products -i <input_folder> -o <output_folder>')
-    print('    -i    path to FOLDER containing Input files')
-    print('    -o    path to FOLDER containing Output files')
-    print('\nUse quotation marks (") around arguments which contain spaces')
-    print('\nInput files should be SAMI files, in .xml, .prn or text format')
-    print('\nOptions')
-    print('    -x        Output files will be MARC XML rather than MARC 21 (.lex)')
-    print('    --max_size <number|size>')
-    print('              Split output')
-    print('    --header  Use MetAg headers')
-    print('    --help    Display help message and exit')
+    print('\nCorrect syntax is:\n')
+    print('sami2marc_authorities -i <ifile> -o <ofile>'
+          '\n\t\t\t[--max_size <number|size>]'
+          '\n\t\t\t[-x] [--header]')
+    print('\nArguments:')
+    for o in ARGUMENTS:
+        print_opt(o, ARGUMENTS[o])
+    print("""\
+
+Use quotation marks (") around arguments which contain spaces
+Input files should be SAMI Products files, in .xml, .prn or text format
+Output file should be either MARC exchange (.lex) or MARC XML (.xml).\
+
+""")
+    print('Options:')
+    for o in OPTIONS:
+        print_opt(o, OPTIONS[o])
+    print('\nFlags:')
+    for o in FLAGS:
+        print_opt(o, FLAGS[o])
     if extended:
-        print('\n\nIf parameter --max_size is specified:\n'
-              '\tmax_size is EITHER the maximum number of records in an output file \n'
-              '\tOR the (approx.) maximum file size (in KB) \n'
-              '\tif the number has the suffix \'K\'; \n\n'
-              '\tOutput will be written to a sequence of files with the same name \n'
-              '\tas the input file, but with a suffix indicating its order in the \n'
-              '\tgenerated output sequence \n\n'
-              '\tEXCEPT in the special case of --max_size 1 \n'
-              '\t(the file is split into individual records) \n'
-              '\tin which case the output files will be labelled \n'
-              '\twith the record identifier.\n '
-              '\tRecords with duplicate identifiers will be labelled \n'
-              '\twith a _DUPLICATE suffix.'
-              '\tRecords without identifiers will be labelled \n'
-              '\twith _NO IDENTIFIER.')
-        print('\n\nIf parameter --header is specified:\n'
-              '\tMARC XML records will be given a <header> to make them \n'
-              '\tsuitable for the Metadata Aggregator; \n'
-              '\tThe <header> will include the record identifier; \n'
-              '\tFor deleted records, the <header> will have @status="deleted". \n'
-              '\tNOTE: --header can only be used with -x.')
+        print("""\
+            
+If parameter --max_size is specified:
+    max_size is EITHER the maximum number of records in an output file 
+    OR the (approx) maximum file size (in KB) if the number has the suffix 'K';
+    Output will be written to a sequence of files with the same name as the 
+    input file, but with a suffix indicating its order in the generated 
+    output sequence
+    EXCEPT in the special case of --max_size 1 (the file is split into 
+    individual records) in which case the output files will be labelled with 
+    the record identifier;
+    Records with duplicate identifiers will be labelled with _DUPLICATE;
+    Records without identifiers will be labelled with _NO IDENTIFIER.
+
+If parameter --header is specified:
+    MARC XML records will be given a <header> to make them suitable for the 
+    Metadata Aggregator;
+    The <header> will include the record identifier;
+    NOTE: --header can only be used with -x.\
+    """)
     exit_prompt()
 
 
@@ -82,9 +110,10 @@ def main(argv=None):
     print('========================================')
     print('sami2marc_products')
     print('========================================')
-    print('\nThis program converts SAMI files\n'
-          'from text or .prn or XML format\n'
-          'to MARC 21 Bibliographic files in MARC exchange (.lex) or MARC XML format\n')
+    print("""\
+This program converts SAMI files from text, .prn, or XML format
+to MARC 21 Bibliographic files in MARC exchange (.lex) or MARC XML format\
+""")
 
     try:
         opts, args = getopt.getopt(argv, 'hi:o:m:x', ['input_path=', 'output_path=', 'max_size=', 'header', 'help'])
