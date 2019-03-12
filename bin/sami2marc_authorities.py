@@ -273,7 +273,7 @@ to MARC 21 Authority files in MARC exchange (.lex) or MARC XML format\
             if f not in ('input', 'output') and files[f]:
                 if xml:
                     files[f].file_object = open(files[f].path, mode='w', encoding='utf-8', errors='replace')
-                    files[f].file_object.write(XML_HEADER)
+                    files[f].file_object.write(OAI_HEADER if header else XML_HEADER)
                 else:
                     files[f].file_object = open(files[f].path, mode='wb')
                     files[f].file_writer = MARCWriter(files[f].file_object)
@@ -315,7 +315,14 @@ to MARC 21 Authority files in MARC exchange (.lex) or MARC XML format\
                     writer = MARCWriter(current_file)
 
             if record.is_bad():
-                if xml: files['errors'].file_object.write(record.as_xml())
+                if xml:
+                    if header:
+                        files['errors'].file_object.write(OAI_RECORD)
+                        files['errors'].file_object.write(record.header())
+                        files['errors'].file_object.write('<metadata>{}\n</metadata>\n'.format(record.as_xml(namespace=True)))
+                        files['errors'].file_object.write('</record>')
+                    else:
+                        files['errors'].file_object.write(record.as_xml())
                 else: files['errors'].file_writer.write(record)
             else:
                 # Write record to main output file
@@ -337,7 +344,14 @@ to MARC 21 Authority files in MARC exchange (.lex) or MARC XML format\
                                       or (record.modified != 'NEVER' and datetime.datetime.strptime(record.modified,  fmt) >= date) else 'pre'
                     except: print('\nError parsing date')
                     else:
-                        if xml: files[f].file_object.write(record.as_xml())
+                        if xml:
+                            if header:
+                                files[f].file_object.write(OAI_RECORD)
+                                files[f].file_object.write(record.header())
+                                files[f].file_object.write('<metadata>{}\n</metadata>\n'.format(record.as_xml(namespace=True)))
+                                files[f].file_object.write('</record>')
+                            else:
+                                files[f].file_object.write(record.as_xml())
                         else: files[f].file_writer.write(record)
 
     # Write closing elements in files
