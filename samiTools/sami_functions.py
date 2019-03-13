@@ -16,7 +16,6 @@ import string
 import sys
 import textwrap
 import unicodedata
-# from samiTools.marc_data import *
 
 __author__ = 'Victoria Morris'
 __license__ = 'MIT License'
@@ -39,6 +38,8 @@ PRIMO_FLAGS = ('primo_dels', 'primo_upd')
 
 
 class FilePath:
+    """Class for working with files"""
+
     def __init__(self, path=None, function='input'):
         self.path = None
         self.function = function
@@ -69,16 +70,19 @@ class FilePath:
 
 
 def print_opt(o, v, indent=5):
+    """Function to print information about options/arguments for a function"""
     print('{}{:<10}  {:<40}'.format(' ' * indent, o, textwrap.fill(v, width=60 - indent, subsequent_indent=' ' * (indent + 12))))
 
 
 def date_time(message='All processing complete'):
+    """Function to print a message, followed by the current date and time"""
     if message: print('\n\n' + str(message))
     print('----------------------------------------')
     print(str(datetime.datetime.now()))
 
 
 def date_time_exit():
+    """Function to exit the program after displaying the current date and time"""
     date_time()
     sys.exit()
 
