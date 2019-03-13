@@ -8,6 +8,7 @@
 # Import required modules
 from math import log10
 from samiTools.marc_data import *
+import profile
 
 # Set locale to assist with sorting
 locale.setlocale(locale.LC_ALL, '')
@@ -99,6 +100,7 @@ If parameter --header is specified:
 
 
 def main(argv=None):
+    if argv is None: name = str(sys.argv[1])
     if argv is None: name = str(sys.argv[1])
 
     xml, split, header, deleted = False, False, False, False
@@ -197,7 +199,10 @@ to MARC 21 Bibliographic files in MARC exchange (.lex) or MARC XML format\
             ifile = open(os.path.join(input_path, file), mode='r', encoding='utf-8', errors='replace')
             reader_type = 'prn' if ext == '.prn' else 'xml' if ext == '.xml' else 'txt'
             ext = '.xml' if xml else '.lex'
-            reader = SAMIReader(ifile, reader_type=reader_type)
+            reader = sami_factory(reader_type=reader_type, target=ifile)
+
+            OPEN = OAI_HEADER if header else XML_HEADER
+            CLOSE = '\n</ListRecords>\n</OAI-PMH>' if header else '\n</marc:collection>'
 
             # Special case if file is to be split into separate records
             if split:
@@ -214,15 +219,12 @@ to MARC 21 Bibliographic files in MARC exchange (.lex) or MARC XML format\
                     if xml:
                         current_file = open(filename, 'w', encoding='utf-8', errors='replace')
                         if header:
-                            current_file.write(METAG_HEADER)
-                            current_file.write(record.header(deleted=deleted))
+                            current_file.write(METAG_HEADER + record.header(deleted=deleted))
                             if not (deleted or record.deleted):
                                 current_file.write('<metadata>{}\n</metadata>\n'.format(record.as_xml(namespace=True)))
                             current_file.write('</record>')
                         else:
-                            current_file.write(XML_HEADER)
-                            current_file.write(record.as_xml())
-                            current_file.write('\n</marc:collection>')
+                            current_file.write('{}{}\n</marc:collection>'.format(XML_HEADER, record.as_xml()))
                     else:
                         current_file = open(filename, mode='wb')
                         writer = MARCWriter(current_file)
@@ -245,7 +247,7 @@ to MARC 21 Bibliographic files in MARC exchange (.lex) or MARC XML format\
 
             if xml:
                 current_file = open(filename, 'w', encoding='utf-8', errors='replace')
-                current_file.write(OAI_HEADER if header else XML_HEADER)
+                current_file.write(OPEN)
             else:
                 current_file = open(filename, mode='wb')
                 writer = MARCWriter(current_file)
@@ -260,9 +262,7 @@ to MARC 21 Bibliographic files in MARC exchange (.lex) or MARC XML format\
                 current_size += len(record.as_xml()) if xml else len(record.as_marc())
                 if (limit == 'size' and current_size >= max_size) \
                         or (limit == 'number' and record_count_in_file > max_size):
-                    if xml:
-                        if header: current_file.write('\n</ListRecords>\n</OAI-PMH>')
-                        else: current_file.write('\n</marc:collection>')
+                    if xml: current_file.write(CLOSE)
                     current_file.close()
                     print('{} records processed'.format(str(record_count)), end='\r')
                     print('\nFile {} done'.format(str(current_idx)))
@@ -273,25 +273,19 @@ to MARC 21 Bibliographic files in MARC exchange (.lex) or MARC XML format\
                     filename = os.path.join(output_path, root + mid + ext)
                     if xml:
                         current_file = open(filename, 'w', encoding='utf-8', errors='replace')
-                        current_file.write(OAI_HEADER if header else XML_HEADER)
+                        current_file.write(OPEN)
                     else:
                         current_file = open(filename, mode='wb')
                         writer = MARCWriter(current_file)
 
-                if xml:
-                    if header:
-                        current_file.write(OAI_RECORD)
-                        current_file.write(record.header(deleted=deleted))
-                        if not (deleted or record.deleted):
-                            current_file.write('<metadata>{}\n</metadata>\n'.format(record.as_xml(namespace=True)))
-                        current_file.write('</record>')
-                    else:
-                        current_file.write(record.as_xml())
+                record_to_write = '{}{}{}</record>'.format(OAI_RECORD, record.header(deleted=deleted),
+                                                           '<metadata>{}\n</metadata>\n'.format(record.as_xml(namespace=True)) if not (deleted or record.deleted) else '') if header \
+                    else record.as_xml()
+
+                if xml: current_file.write(record_to_write)
                 else: writer.write(record)
 
-            if xml:
-                if header: current_file.write('\n</ListRecords>\n</OAI-PMH>')
-                else: current_file.write('\n</marc:collection>')
+            if xml: current_file.write(CLOSE)
             print('{} records processed'.format(str(record_count)), end='\r')
             # Close files
             for f in [ifile, current_file]:
@@ -301,3 +295,4 @@ to MARC 21 Bibliographic files in MARC exchange (.lex) or MARC XML format\
 
 if __name__ == '__main__':
     main(sys.argv[1:])
+

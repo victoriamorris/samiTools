@@ -224,9 +224,15 @@ to MARC 21 Authority files in MARC exchange (.lex) or MARC XML format\
     print(str(datetime.datetime.now()))
 
     ifile = open(files['input'].path, mode='r', encoding='utf-8', errors='replace')
-    reader = SAMIReader(ifile, reader_type='xml' if files['input'].ext == '.xml' else 'authorities', tidy=tidy)
+    reader = sami_factory(reader_type='xml' if files['input'].ext == '.xml' else 'authorities', target=ifile, tidy=tidy)
     output_path, root = os.path.split(files['output'].path)
+    if not os.path.isdir(output_path):
+        try: os.makedirs(output_path)
+        except: exit_prompt('Error: Could not parse path to output file')
     root, ext = os.path.splitext(root)
+
+    OPEN = OAI_HEADER if header else XML_HEADER
+    CLOSE = '\n</ListRecords>\n</OAI-PMH>' if header else '\n</marc:collection>'
 
     # Special case if file is to be split into separate records
     if split:
@@ -244,14 +250,9 @@ to MARC 21 Authority files in MARC exchange (.lex) or MARC XML format\
             if xml:
                 current_file = open(filename, 'w', encoding='utf-8', errors='replace')
                 if header:
-                    current_file.write(METAG_HEADER)
-                    current_file.write(record.header())
-                    current_file.write('<metadata>{}\n</metadata>\n'.format(record.as_xml(namespace=True)))
-                    current_file.write('</record>')
+                    current_file.write('{}{}<metadata>{}\n</metadata>\n</record>'.format(METAG_HEADER, record.header(), record.as_xml(namespace=True)))
                 else:
-                    current_file.write(XML_HEADER)
-                    current_file.write(record.as_xml())
-                    current_file.write('\n</marc:collection>')
+                    current_file.write('{}{}\n</marc:collection>'.format(XML_HEADER, record.as_xml()))
             else:
                 current_file = open(filename, mode='wb')
                 writer = MARCWriter(current_file)
@@ -273,14 +274,14 @@ to MARC 21 Authority files in MARC exchange (.lex) or MARC XML format\
             if f not in ('input', 'output') and files[f]:
                 if xml:
                     files[f].file_object = open(files[f].path, mode='w', encoding='utf-8', errors='replace')
-                    files[f].file_object.write(OAI_HEADER if header else XML_HEADER)
+                    files[f].file_object.write(OPEN)
                 else:
                     files[f].file_object = open(files[f].path, mode='wb')
                     files[f].file_writer = MARCWriter(files[f].file_object)
 
         if xml:
             current_file = open(filename, 'w', encoding='utf-8', errors='replace')
-            current_file.write(OAI_HEADER if header else XML_HEADER)
+            current_file.write(OPEN)
         else:
             current_file = open(filename, mode='wb')
             writer = MARCWriter(current_file)
@@ -295,9 +296,7 @@ to MARC 21 Authority files in MARC exchange (.lex) or MARC XML format\
             current_size += len(record.as_xml()) if xml else len(record.as_marc())
             if (limit == 'size' and current_size >= max_size) \
                     or (limit == 'number' and record_count_in_file > max_size):
-                if xml:
-                    if header: current_file.write('\n</ListRecords>\n</OAI-PMH>')
-                    else: current_file.write('\n</marc:collection>')
+                if xml: current_file.write(CLOSE)
                 current_file.close()
                 print('{} records processed'.format(str(record_count)), end='\r')
                 print('\nFile {} done'.format(str(current_idx)))
@@ -309,33 +308,22 @@ to MARC 21 Authority files in MARC exchange (.lex) or MARC XML format\
                 filename = os.path.join(output_path, root + mid + ext)
                 if xml:
                     current_file = open(filename, 'w', encoding='utf-8', errors='replace')
-                    current_file.write(OAI_HEADER if header else XML_HEADER)
+                    current_file.write(OPEN)
                 else:
                     current_file = open(filename, mode='wb')
                     writer = MARCWriter(current_file)
 
+            record_to_write = '{}{}<metadata>{}\n</metadata>\n</record>'.format(OAI_RECORD, record.header(), record.as_xml(namespace=True)) if header \
+                else record.as_xml()
+
             if record.is_bad():
                 if xml:
-                    if header:
-                        files['errors'].file_object.write(OAI_RECORD)
-                        files['errors'].file_object.write(record.header())
-                        files['errors'].file_object.write('<metadata>{}\n</metadata>\n'.format(record.as_xml(namespace=True)))
-                        files['errors'].file_object.write('</record>')
-                    else:
-                        files['errors'].file_object.write(record.as_xml())
+                    files['errors'].file_object.write(record_to_write)
                 else: files['errors'].file_writer.write(record)
             else:
                 # Write record to main output file
-                if xml:
-                    if header:
-                        current_file.write(OAI_RECORD)
-                        current_file.write(record.header())
-                        current_file.write('<metadata>{}\n</metadata>\n'.format(record.as_xml(namespace=True)))
-                        current_file.write('</record>')
-                    else:
-                        current_file.write(record.as_xml())
-                else:
-                    writer.write(record)
+                if xml: current_file.write(record_to_write)
+                else: writer.write(record)
                 # If splitting by date, write record to appropriate output file
                 if date:
                     fmt = '%Y%m%d' if tidy else '%d/%m/%Y'
@@ -344,24 +332,15 @@ to MARC 21 Authority files in MARC exchange (.lex) or MARC XML format\
                                       or (record.modified != 'NEVER' and datetime.datetime.strptime(record.modified,  fmt) >= date) else 'pre'
                     except: print('\nError parsing date')
                     else:
-                        if xml:
-                            if header:
-                                files[f].file_object.write(OAI_RECORD)
-                                files[f].file_object.write(record.header())
-                                files[f].file_object.write('<metadata>{}\n</metadata>\n'.format(record.as_xml(namespace=True)))
-                                files[f].file_object.write('</record>')
-                            else:
-                                files[f].file_object.write(record.as_xml())
+                        if xml: files[f].file_object.write(record_to_write)
                         else: files[f].file_writer.write(record)
 
     # Write closing elements in files
     if xml:
-        if header: current_file.write('\n</ListRecords>\n</OAI-PMH>')
-        else: current_file.write('\n</marc:collection>')
+        current_file.write(CLOSE)
         for f in files:
             if f != 'input' and files[f] and files[f].file_object:
-                if header: files[f].file_object.write('\n</ListRecords>\n</OAI-PMH>')
-                else: files[f].file_object.write('\n</marc:collection>')
+                files[f].file_object.write(CLOSE)
 
     print('{} records processed'.format(str(record_count)), end='\r')
 
