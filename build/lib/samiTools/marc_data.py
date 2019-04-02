@@ -1,4 +1,4 @@
-#  -*- coding: utf-8 -*-
+#  -*- coding: utf8 -*-
 
 """MARC record processing tools used within samiTools."""
 

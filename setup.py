@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# -*- coding: utf8 -*-
+# -*- coding: utf-8 -*-
 
 """setup.py file for samiTools."""
 
@@ -24,6 +24,7 @@ long_description = ''
 requirements = [
     'py2exe',
     'regex',
+    'html'
 ]
 
 # Setup
