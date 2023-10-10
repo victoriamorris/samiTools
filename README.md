@@ -239,7 +239,7 @@ If parameter `--max_size` is specified:
 * Records without identifiers will be labelled with _NO IDENTIFIER.
 
 If parameter `--oral_history` is specified:
-**This will over-ride the value of `--max_size` (if set) and set `--max_size 1`**
+* **This will over-ride the value of `--max_size` (if set) and set `--max_size 1`**
 * `--oral_history` must be a valid folder path;
 * Records for oral histories and interviews will be saved to this path;
 * Records are selected on the basis of 975 $a 'ark' AND 653 $a 'oral histories' or 'interviews' (case insensitive).
