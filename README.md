@@ -209,6 +209,7 @@ in either MARC exchange (`.lex`) or MARC XML (`.xml`) format.
 ```
 Usage: sami2marc_products.exe -i <input_path> -o <output_path>
                             [--max_size <number|size>]
+                            [--oral_history <path>]
                             [-x] [--header]
 
 Arguments:
@@ -218,6 +219,8 @@ Arguments:
 Options:
     --max_size <number|size>
               Split output by size or number of records
+    --oral_history <path>
+               Save oral history records to a separate folder
 
 Flags:
     -x        Output files will be MARC XML rather than MARC 21 (.lex)
@@ -234,6 +237,12 @@ If parameter `--max_size` is specified:
 * EXCEPT in the special case of `--max_size 1` (the file is split into individual records) in which case the output files will be labelled	with the record identifier.
 * Records with duplicate identifiers will be labelled with a _DUPLICATE suffix.
 * Records without identifiers will be labelled with _NO IDENTIFIER.
+
+If parameter `--oral_history` is specified:
+**This will over-ride the value of `--max_size` (if set) and set `--max_size 1`**
+* `--oral_history` must be a valid folder path;
+* Records for oral histories and interviews will be saved to this path;
+* Records are selected on the basis of 975 $a 'ark' AND 653 $a 'oral histories' or 'interviews' (case insensitive).
 
 If parameter --header is specified:
 * MARC XML records will be given a `<header>` to make them suitable for the Metadata Aggregator.
