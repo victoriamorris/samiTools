@@ -4,7 +4,7 @@
 
 # Import required modules
 
-from samiTools.sami_functions import *
+from sami.sami_functions import *
 
 __author__ = 'Victoria Morris'
 __license__ = 'MIT License'
@@ -102,11 +102,15 @@ class RecordWritingError(Exception):
 
 def sami_factory(reader_type, target, tidy=False):
     """Returns the correct SAMIReader object depending on the reader_type"""
-    if reader_type == 'authorities': return SAMIReaderAuthorities(target, tidy)
-    if reader_type == 'prn': return SAMIReaderPRN(target, tidy)
-    if reader_type == 'xml': return SAMIReaderXML(target, tidy)
-    if reader_type == 'txt': return SAMIReaderText(target, tidy)
-    raise Exception('The reader_type {} is not supported.'.format(reader_type))
+    if reader_type == 'authorities':
+        return SAMIReaderAuthorities(target, tidy)
+    if reader_type == 'prn':
+        return SAMIReaderPRN(target, tidy)
+    if reader_type == 'xml':
+        return SAMIReaderXML(target, tidy)
+    if reader_type == 'txt':
+        return SAMIReaderText(target, tidy)
+    raise Exception(f'The reader_type {reader_type} is not supported.')
 
 
 class SAMIReader(object):
@@ -253,6 +257,22 @@ class SAMIRecord(object):
 
     def is_bad(self):
         return self.error
+
+    def is_oral_history(self):
+        ark = False
+        if '975' not in self.record:
+            return False
+        for field in self.record.get_fields('975'):
+            for subfield in field.get_subfields('a'):
+                if 'ark' in subfield.lower():
+                    ark = True
+        if not ark:
+            return False
+        for field in self.record.get_fields('653'):
+            for subfield in field.get_subfields('a'):
+                if 'oral histories' in subfield.lower() or 'interviews' in subfield.lower():
+                    return True
+        return False
 
 
 class SAMIRecordAuthorities(SAMIRecord):
@@ -414,6 +434,7 @@ class SAMIRecordText(SAMIRecord):
                                 pass
                         f = Field(tag=tag, indicators=[ind1, ind2], subfields=subfields)
                     self.record.add_ordered_field(f)
+
 
 class MARCReader(object):
 
